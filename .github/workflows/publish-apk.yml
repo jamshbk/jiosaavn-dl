@@ -1,0 +1,41 @@
+name: Publish APK download
+on:
+  push:
+    branches: [codex/saavn-pocket-android]
+    paths: ['.github/workflows/publish-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Download completed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: saavn-pocket-debug-apk
+          run-id: 43678572416
+          github-token: ${{ github.token }}
+          path: apk
+      - name: Check and name APK
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile, shutil
+          files = list(Path('apk').glob('*.apk'))
+          assert len(files) == 1, 'Expected exactly one APK'
+          with zipfile.ZipFile(files[0]) as z:
+              assert z.testzip() is None
+              assert 'AndroidManifest.xml' in z.namelist()
+              assert 'classes.dex' in z.namelist()
+          shutil.copyfile(files[0], 'Saavn-Pocket-v0.1.0-debug.apk')
+          PY
+          sha256sum Saavn-Pocket-v0.1.0-debug.apk > SHA256SUMS.txt
+      - name: Publish direct download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create saavn-pocket-v0.1.0 Saavn-Pocket-v0.1.0-debug.apk SHA256SUMS.txt --target 3e0aec3cbd39164444b0b1aa7b3ce7ee426a2a69 --prerelease --title 'Saavn Pocket v0.1.0 (debug)' --notes 'Python Android prototype: song search and link downloads. Android 10+ ARM64. Build succeeded; not yet tested on a physical phone. Install the APK asset below.'
