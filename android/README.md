@@ -1,4 +1,4 @@
-# Saavn Pocket 0.2.0
+# Saavn Pocket 0.2.1
 
 Python Android application with a responsive local WebView UI. The Python server
 binds only to 127.0.0.1. No external server or user account is needed by the app.
@@ -43,7 +43,7 @@ They do not establish live-service compatibility or Android playback/storage beh
 ## APK
 
 The GitHub workflow builds Android 10+ ARM64 debug APKs and publishes a release
-asset for direct download. The 0.2.0 build uses a new debug signing identity.
+asset for direct download. The 0.2.1 build uses a new debug signing identity.
 Uninstall 0.1.0 if Android rejects an update with a signature conflict. Subsequent
 0.2.x builds cache the debug signing identity. Physical-phone testing is still needed.
 

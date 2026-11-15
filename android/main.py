@@ -225,12 +225,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/clipboard':
                 if not ANDROID:
                     raise ValueError('Please paste with your keyboard or browser clipboard.')
-                from jnius import autoclass
-                activity = autoclass('org.kivy.android.PythonActivity').mActivity
-                clipboard = activity.getSystemService('clipboard')
-                clip = clipboard.getPrimaryClip()
-                value = clip.getItemAt(0).coerceToText(activity).toString() if clip and clip.getItemCount() else ''
-                return self.respond({'text': str(value)})
+                from android_bridge import read_clipboard
+                return self.respond({'text': read_clipboard()})
             if path == '/api/play':
                 with LOCK:
                     record = CATALOG.get(body.get('key'))
@@ -264,6 +260,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    if ANDROID:
+        try:
+            from android_bridge import initialize
+            bridge = initialize()
+            if bridge['activity'].getIntent().getBooleanExtra('saavn_native_test', False):
+                from storage import native_storage_check
+                native_storage_check(DATA)
+                print('SAAVN_NATIVE_CHECK_OK', flush=True)
+        except Exception as error:
+            print('SAAVN_NATIVE_CHECK_FAILED: ' + str(error), flush=True)
     server = ThreadingHTTPServer(('127.0.0.1', int(os.environ.get('SAAVN_PORT', '5000'))), Handler)
     server.daemon_threads = True
     server.serve_forever()
