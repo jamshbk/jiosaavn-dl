@@ -59,5 +59,10 @@ jobs:
           'NDK_ERROR':'unknown target cpu',
           'HOSTPYTHON_MISSING':'hostpython',
           'NO_COLLECTION':'could not find'}.items()}}))
+          vocabulary=set('error failed failure pip python ssl ctypes ffi openssl socket connect connection network timeout timed retry retries module import missing no not found supported unsupported required requires version distribution wheel build environment managed externally venv virtual system package permission denied executable libpython ELF wrong class architecture arm64 x86_64 platform attribute argument unexpected unrecognized command install upgrade uninstall broken pipe closed reset certificate verify verification proxy host port unreachable requests urllib3 certifi truststore memory space device disk errno'.lower().split())
+          region=text[text.rfind('STDOUT:'):][-20000:] if 'STDOUT:' in text else text[-20000:]
+          words=re.findall(r'[A-Za-z_][A-Za-z_0-9]*',region.lower())
+          print(json.dumps({'allowlisted_error_words':sorted(set(words)&vocabulary)}))
+          print(json.dumps({'allowlisted_error_line_words':[sorted(set(re.findall(r'[A-Za-z_][A-Za-z_0-9]*',line.lower()))&vocabulary) for line in region.splitlines() if any(word in line.lower() for word in ['error','exception','failed','cannot','could not','no module'])][-12:]}))
           PY
           rm -f "$RUNNER_TEMP/compiler.log"
