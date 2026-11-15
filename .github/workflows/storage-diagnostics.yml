@@ -64,5 +64,11 @@ jobs:
           words=re.findall(r'[A-Za-z_][A-Za-z_0-9]*',region.lower())
           print(json.dumps({'allowlisted_error_words':sorted(set(words)&vocabulary)}))
           print(json.dumps({'allowlisted_error_line_words':[sorted(set(re.findall(r'[A-Za-z_][A-Za-z_0-9]*',line.lower()))&vocabulary) for line in region.splitlines() if any(word in line.lower() for word in ['error','exception','failed','cannot','could not','no module'])][-12:]}))
+          import sys
+          modules=set(sys.stdlib_module_names)|{'pip','setuptools','pkg_resources','distutils','requests','certifi','urllib3','truststore','typing_extensions','platformdirs','packaging','pyproject_hooks','wheel','Cython'}
+          missing=re.findall(r'No module named [\\\'"]([^\\\'"]+)',text)
+          print(json.dumps({'public_missing_modules':sorted({name.split('.')[0] if name.split('.')[0] in modules else 'sysconfigdata' if name.startswith('_sysconfigdata') else 'other' for name in missing})}))
+          more={'PIP_UNINSTALL':'cannot uninstall','PIP_RECORD':'record file','PIP_ENTRYPOINT':'no module named pip.__main__','HOST_VENV':'ensurepip','MISSING_MAIN':'__main__','PYTHON_STARTUP':'failed to get the python codec','PIP_VERSION':'pip version','SYSTEM_PYTHON':'system python','UNKNOWN_COMMAND':'command not found','PEP517':'backendunavailable','BROKEN_PIP':'pip._internal','NO_SCRIPT':'bad interpreter','INITFS':'init_fs_encoding','PIP_USAGE':'usage:','NO_METADATA':'no package metadata','ENV_PYTHONPATH':'pythonpath','SYS_CONFIG':'sysconfigdata','ELF_HEADER':'invalid elf','DOWNLOAD_ERROR':'read timed out','OPTION':'no such option','PIP_EXACT':'error:','DNS_ERROR':'name or service not known'}
+          print(json.dumps({'full_log_categories':{key:pattern in text.lower() for key,pattern in more.items()}}))
           PY
           rm -f "$RUNNER_TEMP/compiler.log"
