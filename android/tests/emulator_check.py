@@ -123,7 +123,7 @@ while time.monotonic()<deadline:
     for node in nodes:
         label=(node.get('text') or node.get('content-desc') or '').strip()
         if not entered and label=='SaavnDl-CI':candidates=[node];entered=True;break
-        if entered and (label.lower() in ('use this folder','allow','select') or label.lower().startswith('allow access to') or node.get('resource-id','').endswith('/action_menu_select')):candidates.append(node)
+        if entered and (label.lower() in ('use this folder','allow','select') or (label.lower().startswith('allow access to') and node.get('clickable')=='true') or node.get('resource-id','').endswith('/action_menu_select')):candidates.append(node)
     if not candidates and not entered:
         # Older DocumentsUI versions may ignore EXTRA_INITIAL_URI.
         for wanted in ('Documents','Internal storage','Pixel 2','Show roots','Show navigation drawer'):
