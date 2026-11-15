@@ -1,0 +1,143 @@
+name: Build Saavn Pocket APK
+on:
+  push:
+    branches: [codex/saavn-pocket-android]
+    paths: ['android/**', '.github/workflows/saavn-isolated.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64-v8a, x86_64]
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Restore debug signing identity
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: saavn-pocket-webview-debug-signing-v1
+      - name: Cache build toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            android/.buildozer
+          key: saavn-webview-isolated-${{ matrix.arch }}-v1
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
+          python -m pip install 'buildozer==1.5.0' 'Cython==0.29.36' setuptools requests mutagen playwright
+      - name: Check backend and Android bridge
+        run: python -m unittest discover -s tests -v
+      - name: Check responsive screens and app flow
+        if: matrix.arch == 'arm64-v8a'
+        run: |
+          python -m playwright install --with-deps chromium
+          python tests/ui_check.py
+      - name: Build isolated architecture
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          path = Path('buildozer.spec')
+          path.write_text(re.sub(r'^android.archs = .*$', 'android.archs = ' + os.environ['BUILD_ARCH'], path.read_text(), flags=re.M))
+          PY
+          buildozer -v android debug
+      - name: Verify and name APK
+        run: |
+          python - <<'PY'
+          import zipfile, shutil
+          from pathlib import Path
+          files = list(Path('bin').glob('*.apk'))
+          assert len(files) == 1, 'Expected one APK'
+          with zipfile.ZipFile(files[0]) as z:
+              assert z.testzip() is None
+              assert 'AndroidManifest.xml' in z.namelist()
+              assert 'classes.dex' in z.namelist()
+          shutil.copyfile(files[0], 'Saavn-Pocket-v0.2.1-debug.apk')
+          PY
+          sha256sum Saavn-Pocket-v0.2.1-debug.apk > SHA256SUMS.txt
+      - name: Upload architecture APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: saavn-pocket-v0.2.1-${{ matrix.arch }}
+          path: |
+            android/Saavn-Pocket-v0.2.1-debug.apk
+            android/SHA256SUMS.txt
+          if-no-files-found: error
+  android-check:
+    name: Verify Android storage
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: python -m pip install requests
+      - uses: actions/download-artifact@v4
+        with:
+          name: saavn-pocket-v0.2.1-x86_64
+          path: android
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Check native MediaStore export on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python android/tests/emulator_check.py
+      - name: Save test result only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saavn-pocket-v0.2.1-native-result
+          path: android/native-check-result.txt
+          if-no-files-found: ignore
+  publish:
+    name: Publish checked APK
+    needs: android-check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: saavn-pocket-v0.2.1-arm64-v8a
+          path: apk
+      - name: Publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          gh release create saavn-pocket-v0.2.1 apk/Saavn-Pocket-v0.2.1-debug.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'Saavn Pocket v0.2.1 (debug)' --notes 'Fixes Android ClassNotFoundException during download export and clipboard access by preloading app Java references on the Python entry thread. Worker-thread MediaStore export and byte-for-byte readback are checked on an Android emulator before publishing. Phone APK: Android 10+, ARM64. Physical-phone and live-service testing remains separate.'

@@ -24,7 +24,7 @@ while time.monotonic()<deadline:
         success=True
         break
     time.sleep(2)
-Path('android/native-check.log').write_text(log,encoding='utf-8')
+Path('android/native-check-result.txt').write_text('PASS' if success else 'FAIL',encoding='utf-8')
 if not success:
     lines=[line for line in log.splitlines() if any(s in line for s in ('python','Python','FATAL','SAAVN_'))]
     raise SystemExit('Android native storage check failed:\n'+'\n'.join(lines[-100:]))
