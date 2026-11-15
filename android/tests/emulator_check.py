@@ -123,12 +123,22 @@ while time.monotonic()<deadline:
     for node in nodes:
         label=(node.get('text') or node.get('content-desc') or '').strip()
         if not entered and label=='SaavnDl-CI':candidates=[node];entered=True;break
-        if entered and label.lower() in ('use this folder','allow','select'):candidates.append(node)
+        if entered and (label.lower() in ('use this folder','allow','select') or label.lower().startswith('allow access to') or node.get('resource-id','').endswith('/action_menu_select')):candidates.append(node)
+    if not candidates and not entered:
+        # Older DocumentsUI versions may ignore EXTRA_INITIAL_URI.
+        for wanted in ('Documents','Internal storage','Pixel 2','Show roots','Show navigation drawer'):
+            matches=[node for node in nodes if (node.get('text') or node.get('content-desc') or '').strip()==wanted]
+            if matches:
+                candidates=matches[:1]
+                break
     if candidates:
         bounds=list(map(int,re.findall(r'\d+',candidates[0].get('bounds',''))))
         if len(bounds)==4:adb('shell','input','tap',str((bounds[0]+bounds[2])//2),str((bounds[1]+bounds[3])//2))
     time.sleep(1)
-else:raise AssertionError('Android folder picker did not complete.')
+else:
+    (previews/'folder-picker-failure.png').write_bytes(subprocess.run(['adb','exec-out','screencap','-p'],check=True,capture_output=True).stdout)
+    labels=[(node.get('text') or node.get('content-desc') or '',node.get('resource-id','')) for node in nodes]
+    raise AssertionError('Android folder picker did not complete: '+json.dumps(labels))
 assert api('native-check-folder',{})['ok']
 saved_uri=api('destination')['uri']
 time.sleep(1)
