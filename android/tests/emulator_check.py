@@ -12,7 +12,7 @@ def adb(*args, check=True):
     return subprocess.run(['adb',*args],check=check,text=True,capture_output=True).stdout
 
 
-apk=Path('android/SaavnDl-v1.0-debug.apk')
+apk=Path('android/SaavnDl-v1.0-startup-fix.apk')
 adb('install','-r',str(apk))
 # Cold-boot system overlays can still be applying after sys.boot_completed.
 time.sleep(20)

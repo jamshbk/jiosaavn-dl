@@ -1,4 +1,4 @@
-name: Build SaavnDl 1.0 APK
+name: Build SaavnDl 1.0 startup fix
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -79,15 +79,20 @@ jobs:
               assert z.testzip() is None
               assert 'AndroidManifest.xml' in z.namelist()
               assert 'classes.dex' in z.namelist()
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-debug.apk')
+              loader = z.read('assets/_load.html').decode()
+              assert 'saavndl-bootstrap' in loader, 'Default WebView loader must be replaced'
+              assert 'startup-logo.png' in loader
+              assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
+              assert '.splash' in z.read('assets/startup-style.css').decode()
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-startup-fix.apk')
           PY
-          sha256sum SaavnDl-v1.0-debug.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-startup-fix.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-debug.apk
+            android/SaavnDl-v1.0-startup-fix.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -152,4 +157,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0 apk/SaavnDl-v1.0-debug.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0' --notes 'SaavnDl 1.0: native system-bar insets, editable filename templates with previews, persistent custom output folder picker, smoother transitions, original launcher logo and animated splash. Android storage and custom-folder permission tests run on emulators before publishing. Phone APK: Android 10+, ARM64.'
+          gh release create saavndl-v1.0-startup-fix apk/SaavnDl-v1.0-startup-fix.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — startup fix' --notes 'SaavnDl 1.0 startup fix: replaced the white Python/WebView loader with the original dark animated SaavnDl splash from the first WebView frame. Version remains 1.0; Android version code 1001. Android 10 and 15 emulator checks pass before publishing. ARM64, Android 10+.'
