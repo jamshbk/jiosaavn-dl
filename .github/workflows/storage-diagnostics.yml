@@ -43,9 +43,21 @@ jobs:
           print(json.dumps({'last_recipe_category':max(recipes,key=lambda key:tail.rfind('building '+key)) if any('building '+key in tail for key in recipes) else 'unknown'}))
           import re
           allowed=['TypeError','ValueError','RuntimeError','AssertionError','AttributeError','ImportError','ModuleNotFoundError','KeyError','IndexError','FileNotFoundError','FileExistsError','PermissionError','OSError','ErrorReturnCode_1','ErrorReturnCode_2','BuildInterruptingException','CalledProcessError']
-          print(json.dumps({'exception_categories':[key for key in allowed if key+':' in tail]}))
+          print(json.dumps({'exception_categories':[key for key in allowed if key.lower()+':' in tail]}))
           public_modules={'bootstrap.py','toolchain.py','recipe.py','build.py','__init__.py','android.py','sh.py','util.py','pythonforandroid.py','logger.py','archs.py'}
           frames=re.findall(r'File "([^"]+)", line (\d+)',text[-100000:])
           print(json.dumps({'public_frame_lines':[{'module':Path(p).name,'line':int(n)} for p,n in frames if Path(p).name in public_modules][-12:]}))
+          print(json.dumps({'pip_categories':{key:pattern in tail for key,pattern in {
+          'NO_MATCHING_DISTRIBUTION':'no matching distribution found',
+          'NO_REQUIREMENT_VERSION':'could not find a version that satisfies',
+          'PACKAGE_METADATA_ERROR':'metadata-generation-failed',
+          'SETUPPY_ERROR':'subprocess-exited-with-error',
+          'PYJNIUS_BUILD_ERROR':'failed building wheel for pyjnius',
+          'MISSING_PIP':'no module named pip',
+          'PEP668':'externally-managed-environment',
+          'PIPSSL':'certificate verify failed',
+          'NDK_ERROR':'unknown target cpu',
+          'HOSTPYTHON_MISSING':'hostpython',
+          'NO_COLLECTION':'could not find'}.items()}}))
           PY
           rm -f "$RUNNER_TEMP/compiler.log"
