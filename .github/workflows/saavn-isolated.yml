@@ -1,4 +1,4 @@
-name: Build Saavn Pocket APK
+name: Build SaavnDl 1.0 APK
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -51,6 +51,12 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
           python tests/ui_check.py
+      - name: Upload UI previews
+        if: matrix.arch == 'arm64-v8a'
+        uses: actions/upload-artifact@v4
+        with:
+          name: saavndl-v1.0-ui-previews
+          path: android/ui-previews/*.png
       - name: Build isolated architecture
         env:
           BUILD_ARCH: ${{ matrix.arch }}
@@ -73,22 +79,26 @@ jobs:
               assert z.testzip() is None
               assert 'AndroidManifest.xml' in z.namelist()
               assert 'classes.dex' in z.namelist()
-          shutil.copyfile(files[0], 'Saavn-Pocket-v0.2.1-debug.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-debug.apk')
           PY
-          sha256sum Saavn-Pocket-v0.2.1-debug.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-debug.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
-          name: saavn-pocket-v0.2.1-${{ matrix.arch }}
+          name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/Saavn-Pocket-v0.2.1-debug.apk
+            android/SaavnDl-v1.0-debug.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
-    name: Verify Android storage
+    name: Verify Android ${{ matrix.api }}
     needs: build
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -101,7 +111,7 @@ jobs:
       - run: python -m pip install requests
       - uses: actions/download-artifact@v4
         with:
-          name: saavn-pocket-v0.2.1-x86_64
+          name: saavndl-v1.0-x86_64
           path: android
       - name: Enable emulator acceleration
         run: |
@@ -111,7 +121,7 @@ jobs:
       - name: Check native MediaStore export on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           profile: pixel_2
@@ -122,8 +132,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: saavn-pocket-v0.2.1-native-result
-          path: android/native-check-result.txt
+          name: saavndl-v1.0-native-result-${{ matrix.api }}
+          path: |
+            android/native-check-result.txt
+            android/native-previews/*.png
           if-no-files-found: ignore
   publish:
     name: Publish checked APK
@@ -132,7 +144,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: saavn-pocket-v0.2.1-arm64-v8a
+          name: saavndl-v1.0-arm64-v8a
           path: apk
       - name: Publish direct APK download
         env:
@@ -140,4 +152,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavn-pocket-v0.2.1 apk/Saavn-Pocket-v0.2.1-debug.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'Saavn Pocket v0.2.1 (debug)' --notes 'Fixes Android ClassNotFoundException during download export and clipboard access by preloading app Java references on the Python entry thread. Worker-thread MediaStore export and byte-for-byte readback are checked on an Android emulator before publishing. Phone APK: Android 10+, ARM64. Physical-phone and live-service testing remains separate.'
+          gh release create saavndl-v1.0 apk/SaavnDl-v1.0-debug.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0' --notes 'SaavnDl 1.0: native system-bar insets, editable filename templates with previews, persistent custom output folder picker, smoother transitions, original launcher logo and animated splash. Android storage and custom-folder permission tests run on emulators before publishing. Phone APK: Android 10+, ARM64.'

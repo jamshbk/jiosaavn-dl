@@ -3,11 +3,33 @@ from pathlib import Path
 from android_bridge import get_bridge
 
 
-def publish(path, android=False, folder='SaavnPocket', subfolder=''):
+def publish(path, android=False, folder='SaavnDl', subfolder=''):
     if not android:
         return str(path)
+    destination=get_destination()
+    if destination.get('uri'):
+        suffix=Path(path).suffix.lower()
+        mime={'.m4a':'audio/mp4','.zip':'application/zip','.txt':'text/plain'}.get(suffix,'application/octet-stream')
+        name=get_bridge()['NativeUi'].exportToFolder(str(path),subfolder,mime)
+        Path(path).unlink()
+        return destination.get('path',destination['label'])+'/'+(subfolder+'/' if subfolder else '')+str(name)
     destination, uri = _publish_file(path, folder, subfolder)
     return destination
+
+
+def get_destination():
+    import json
+    return json.loads(str(get_bridge()['NativeUi'].getDestination()))
+
+
+def choose_destination():
+    get_bridge()['NativeUi'].chooseFolder()
+    return get_destination()
+
+
+def reset_destination():
+    get_bridge()['NativeUi'].useDefaultFolder()
+    return get_destination()
 
 
 def _publish_file(path, folder, subfolder):

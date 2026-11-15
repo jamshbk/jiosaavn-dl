@@ -29,10 +29,12 @@ def initialize():
                 'Integer': 'java.lang.Integer',
                 'FileInputStream': 'java.io.FileInputStream',
                 'Channels': 'java.nio.channels.Channels',
+                'NativeUi': 'org.saavndl.NativeUi',
             }
             cached = {key: autoclass(name) for key, name in classes.items()}
             cached.update(activity=activity, resolver=activity.getContentResolver(),
                           clipboard=activity.getSystemService('clipboard'))
+            cached['NativeUi'].install(activity)
             _bridge = cached
             _error = ''
             return _bridge

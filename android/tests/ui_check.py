@@ -29,7 +29,7 @@ class FixtureClient:
     def media_url(self, song, quality):
         CALLS.append(('play',quality))
         return 'https://aac.saavncdn.com/test.m4a'
-    def download(self, song, directory, cancel, progress, settings, number):
+    def download(self, song, directory, cancel, progress, settings, number, **kwargs):
         CALLS.append(('download',song['id'],settings['quality']))
         path=Path(directory)/(song['id']+'.m4a')
         path.write_bytes(b'test-fixture')
@@ -52,11 +52,13 @@ def check():
                     page.set_viewport_size({'width':width,'height':height})
                     page.goto('http://127.0.0.1:5000/')
                     expect(page.locator('#home-status')).to_have_text('Ready.')
+                    expect(page.locator('#splash')).to_be_hidden(timeout=7000)
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Home overflow at {width}'
                     assert page.locator('#archive').is_visible()
                     page.screenshot(path=str(outputs/f'home-{width}.png'),full_page=True)
                 page.set_viewport_size({'width':393,'height':852})
                 page.goto('http://127.0.0.1:5000/')
+                expect(page.locator('#splash')).to_be_hidden(timeout=7000)
                 page.get_by_role('button',name='Open settings').first.click()
                 expect(page.locator('#settings')).to_be_visible()
                 page.screenshot(path=str(outputs/'settings-393.png'),full_page=True)
@@ -64,8 +66,19 @@ def check():
                 page.locator('#quality').select_option('160')
                 expect(page.locator('#settings-status')).to_have_text('Changes save automatically.')
                 assert main.PREFS.get()['quality']=='160'
+                page.get_by_text('Names, disc folders and ZIP layout',exact=True).click()
+                template=page.locator('[data-setting="single_track_template"]')
+                template.fill('{artist} - {title}')
+                template.press('Tab')
+                expect(page.locator('[data-preview="single_track_template"]')).to_have_text('Artist - Track title.m4a')
+                expect(page.locator('#settings-status')).to_have_text('Changes save automatically.')
+                assert main.PREFS.get()['single_track_template']=='{artist} - {title}'
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.screenshot(path=str(outputs/'filenames-393.png'),full_page=True)
                 page.reload()
+                expect(page.locator('#splash')).to_be_hidden(timeout=7000)
                 expect(page.locator('#quality')).to_have_value('160')
+                expect(page.locator('[data-setting="single_track_template"]')).to_have_value('{artist} - {title}')
                 page.locator('#settings-back').click()
                 page.locator('#query').fill('https://www.jiosaavn.com/album/evening/token')
                 page.locator('#archive').click()

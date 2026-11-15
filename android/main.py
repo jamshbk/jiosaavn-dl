@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from backend import Client, Cancelled, clean, safe_name
 from settings import Settings
 from storage import publish
+from filenames import render_name
 
 ANDROID = 'ANDROID_ARGUMENT' in os.environ
 ROOT = Path(__file__).resolve().parent
@@ -27,14 +28,24 @@ JOB = {'active': False, 'message': 'Ready.', 'progress': 0, 'saved': 0,
        'failed': 0, 'errors': [], 'warnings': [], 'destination': ''}
 
 
-def register(songs, collection=''):
+def register(songs, collection='', kind='search', album_artist=''):
     result = []
+    discs={str(s.get('disc_number') or s.get('disc') or '1').split('/')[0] for s in songs}
+    multi=len(discs)>1 or any(d.isdigit() and int(d)>1 for d in discs)
+    counters={}
     with LOCK:
         if len(CATALOG) > 2000 and not JOB['active']:
             CATALOG.clear()
         for number, song in enumerate(songs, 1):
+            song=dict(song)
+            disc=str(song.get('disc_number') or song.get('disc') or '1').split('/')[0]
+            song['disc_number']=disc if disc.isdigit() and int(disc)>0 else '1'
+            counters[disc]=counters.get(disc,0)+1
+            file_number=counters[disc] if multi else number
             key = secrets.token_hex(8)
-            CATALOG[key] = {'song': song, 'number': number, 'collection': collection}
+            context='single' if kind in ('song','search') else 'multidisc' if multi else 'album'
+            CATALOG[key] = {'song': song, 'number': file_number, 'collection': collection,
+                            'context':context,'album_artist':album_artist}
             duration = int(song.get('duration') or 0)
             result.append({'key': key, 'title': clean(song.get('song') or song.get('title')),
                            'artist': clean(song.get('primary_artists')),
@@ -84,7 +95,8 @@ def download_worker(records, options, bundle):
                        detail=f'{done / 1048576:.1f} MB' + (f' / {total / 1048576:.1f} MB' if total else ''),
                        progress=((index - 1 + percent) / len(records) * 100))
             try:
-                path, notes = client.download(song, directory, CANCEL, progress, options, record['number'])
+                path, notes = client.download(song, directory, CANCEL, progress, options, record['number'],
+                                               context=record.get('context','single'), album_artist=record.get('album_artist'))
                 if CANCEL.is_set():
                     raise Cancelled()
                 warnings.extend([title + ': ' + n for n in notes])
@@ -106,7 +118,9 @@ def download_worker(records, options, bundle):
             raise Cancelled()
         if bundle and ready:
             status(message='Preparing ZIP archive…')
-            name = safe_name(records[0]['collection'] or records[0]['song'].get('album'))
+            first=records[0]
+            name=render_name(options['album_zip_template'],first['song'],album_artist=first.get('album_artist'),
+                             album_name=first['collection'] or first['song'].get('album'))
             archive = work / (name + '.zip')
             with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
                 for item in ready:
@@ -118,10 +132,10 @@ def download_worker(records, options, bundle):
         if not saved:
             message = 'No songs were saved. See the error details below.'
         status(message=message, progress=100 if saved else 0,
-               destination='Downloads/' + options['folder'] if exported else '')
+               destination=options.get('_destination','Downloads/' + options['folder']) if exported else '')
     except Cancelled:
         status(message='Cancelled. Already exported files are kept.',
-               destination='Downloads/' + options['folder'] if exported else '')
+               destination=options.get('_destination','Downloads/' + options['folder']) if exported else '')
     except Exception as error:
         errors.append(str(error))
         status(message='Could not finish saving. See details.', errors=errors[-20:])
@@ -187,12 +201,24 @@ class Handler(BaseHTTPRequestHandler):
             name = path.rsplit('/', 1)[-1]
             return self.respond((ROOT / 'web' / name).read_bytes(),
                                 mime='text/css' if name.endswith('css') else 'application/javascript')
+        if path=='/assets/logo.png':
+            return self.respond((ROOT/'web/logo.png').read_bytes(),mime='image/png')
         if not self.authorized():
             return
         if path == '/api/settings':
             return self.respond(PREFS.get())
         if path == '/api/job':
             return self.respond(snapshot())
+        if path == '/api/destination':
+            if ANDROID:
+                from storage import get_destination
+                return self.respond(get_destination())
+            return self.respond({'uri':'','label':'Downloads','path':'Downloads','pending':False,'error':'','desktop':True})
+        if path == '/api/device':
+            if ANDROID:
+                from android_bridge import get_bridge
+                return self.respond(json.loads(str(get_bridge()['NativeUi'].getLayoutMetrics())))
+            return self.respond({})
         return self.respond({'error': 'Not found.'}, 404)
 
     def do_POST(self):
@@ -217,7 +243,7 @@ class Handler(BaseHTTPRequestHandler):
                     if query.startswith('www.'):
                         query = 'https://' + query
                     info = client.resolve(query)
-                    info['songs'] = register(info['songs'], info['title'] if info['kind'] != 'song' else '')
+                    info['songs'] = register(info['songs'], info['title'] if info['kind'] != 'song' else '',info['kind'],info.get('artist',''))
                     return self.respond(info)
                 page = max(1, min(int(body.get('page') or 1), 500))
                 songs = register(client.search(query, page))
@@ -227,6 +253,22 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Please paste with your keyboard or browser clipboard.')
                 from android_bridge import read_clipboard
                 return self.respond({'text': read_clipboard()})
+            if path in ('/api/folder/pick','/api/folder/default'):
+                if not ANDROID:
+                    raise ValueError('The Android folder picker is available on the phone app.')
+                with LOCK:
+                    if JOB['active']:
+                        raise ValueError('Wait for the current download to finish before changing folders.')
+                from storage import choose_destination, reset_destination
+                return self.respond(choose_destination() if path.endswith('/pick') else reset_destination())
+            if path=='/api/native-check-folder':
+                if not ANDROID:
+                    return self.respond({'error':'Not found.'},404)
+                from android_bridge import get_bridge
+                bridge=get_bridge()
+                if not bridge['activity'].getIntent().getBooleanExtra('saavn_native_test',False):
+                    return self.respond({'error':'Not found.'},404)
+                return self.respond({'ok':bool(bridge['NativeUi'].checkCustomFolder())})
             if path == '/api/play':
                 with LOCK:
                     record = CATALOG.get(body.get('key'))
@@ -248,6 +290,10 @@ class Handler(BaseHTTPRequestHandler):
                     if not all(records):
                         raise ValueError('Some results expired. Open the album again.')
                     options = PREFS.get()
+                    if ANDROID:
+                        from storage import get_destination
+                        destination=get_destination()
+                        options['_destination']=destination.get('path',destination['label']) if destination.get('uri') else 'Downloads/'+options['folder']
                     bundle = len(records) > 1 and body.get('bundle') is True and options['zip_album']
                     CANCEL.clear()
                     status(active=True, message='Starting download…', progress=0, saved=0,

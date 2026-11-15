@@ -98,7 +98,7 @@ class BackendTests(unittest.TestCase):
                 pass
         tags = Tags()
         with tempfile.TemporaryDirectory() as d, patch.object(backend, 'MP4', return_value=tags):
-            options = {**DEFAULTS, 'quality':'96', 'naming':'track_title', 'embed_lyrics':False,
+            options = {**DEFAULTS, 'quality':'96', 'single_track_template':'{track}. {title}', 'embed_lyrics':False,
                        'save_lyrics':True, 'explicit_tag':False, 'original_date':False}
             path, notes = client.download(SONG, d, threading.Event(), lambda *_:None, options, 3)
             self.assertEqual(path.name, '03. A & B.m4a')
@@ -145,7 +145,7 @@ class ApiTests(unittest.TestCase):
 
     def test_selected_tracks_download_and_zip_layout(self):
         record={'song':SONG,'number':1,'collection':'Example Album'}
-        def fake_download(song, directory, cancel, progress, options, number):
+        def fake_download(song, directory, cancel, progress, options, number, **kwargs):
             path=Path(directory)/('A.m4a' if not (Path(directory)/'A.m4a').exists() else 'B.m4a');path.write_bytes(b'audio')
             path.with_suffix('.txt').write_text('Lyrics')
             return path, []

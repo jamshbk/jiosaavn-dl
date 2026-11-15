@@ -1,50 +1,38 @@
-# Saavn Pocket 0.2.1
+# SaavnDl 1.0
 
-Python Android application with a responsive local WebView UI. The Python server
-binds only to 127.0.0.1. No external server or user account is needed by the app.
+Android 10+ ARM64 music app, with a local-only Python server and responsive WebView UI.
 
-## Changes
+## Version 1.0
 
-- Screenshot-inspired dark home screen, gradient, Archive bar and settings.
-- Responsive phone, landscape and tablet layout; system font supports Unicode.
-- Archive previews song/album/playlist information before any download.
-- Track selection, individual downloads, album ZIP and optional folder layout.
-- Playback with native audio controls and 96/160/320 kbps quality requests.
-- Saved preferences: names, folders, cover art, date/explicit tags and lyrics.
-- Progress, cancellation and visible per-song errors.
+- Native status/navigation/cutout insets in portrait and landscape.
+- Four validated filename templates with live previews; Unicode-safe names.
+- Persistent Android folder picker for custom phone or SD-card destinations.
+- Original SaavnDl launcher logo and animated splash; reduced-motion support.
+- Smooth page/button/accordion transitions.
+- Song/album previews, selected downloads, quality controls and optional album ZIP.
 
-M4A/AAC is the supported format. Region follows the current connection; this app
-does not offer a region override. Requested bitrate depends on service availability.
-Keep the app open for playback and downloads; no foreground service is included.
+The Android picker controls which folders can be granted. Restricted root folders
+cannot be bypassed. Files saved to a chosen folder use that folder directly;
+album/disc subfolders follow the selected preferences. The Downloads subfolder
+setting applies only to the default MediaStore destination.
 
-## Desktop preview
+Filename placeholders: `{title}`, `{artist}`, `{albumArtist}`, `{album}`, `{year}`,
+`{track}`, `{disc}`, `{id}`, `{language}`. File extensions are appended automatically.
+When disc metadata is unavailable, tracks are treated as Disc 1. M4A/AAC is the
+supported audio format. Quality is requested from the service and depends on availability.
 
-```sh
-python -m pip install requests mutagen
-python main.py
-```
-
-Open http://127.0.0.1:5000. Desktop downloads and preferences go in appdata/.
-Android exports completed files to the selected folder under shared Downloads.
+The package ID remains org.example.saavnpocket so signed-compatible builds can
+update an existing installation. The visible app name is SaavnDl and version 1.0.
 
 ## Checks
 
-```sh
-python -m unittest discover -s tests -v
-python -m pip install playwright
-python -m playwright install --with-deps chromium
-python tests/ui_check.py
-```
+Run `python -m unittest discover -s tests -v` from android/ for logic and bridge tests.
+`python tests/ui_check.py` checks responsive screens with deterministic fixtures.
+The CI pipeline builds phone and emulator APKs separately, then checks native
+storage, system-bar insets and persisted custom-folder access on Android emulators.
+These checks do not replace testing the user's physical phone or the live service.
 
-Browser checks use deterministic service fixtures and cover responsive layouts,
-settings persistence, the preview-first flow, safe rendering and selected downloads.
-They do not establish live-service compatibility or Android playback/storage behavior.
-
-## APK
-
-The GitHub workflow builds Android 10+ ARM64 debug APKs and publishes a release
-asset for direct download. The 0.2.1 build uses a new debug signing identity.
-Uninstall 0.1.0 if Android rejects an update with a signature conflict. Subsequent
-0.2.x builds cache the debug signing identity. Physical-phone testing is still needed.
+Desktop preview: install requirements.txt, run `python main.py`, then open
+http://127.0.0.1:5000. Native folder selection is available in the Android app.
 
 Upstream reference: https://github.com/bunnykek/jiosaavn-dl

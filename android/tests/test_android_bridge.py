@@ -81,6 +81,8 @@ class AndroidBridgeTests(unittest.TestCase):
                 'java.lang.Integer': int,
                 'java.io.FileInputStream': FileInput,
                 'java.nio.channels.Channels': SimpleNamespace(newChannel=lambda stream:stream),
+                'org.saavndl.NativeUi': SimpleNamespace(install=lambda _:None,
+                    getDestination=lambda:'{"uri":"","label":"Downloads","path":"Downloads","pending":false,"error":""}'),
             }[name]
         self.patches = [patch.object(android_bridge,'_bridge',None),
                         patch.object(android_bridge,'_error',''),
@@ -143,6 +145,30 @@ class AndroidBridgeTests(unittest.TestCase):
             getItemAt=lambda _:SimpleNamespace(coerceToText=lambda _: 'https://www.jiosaavn.com/song/a/token'))
         self.clipboard.getPrimaryClip.return_value=clip
         self.assertEqual(self.run_worker(android_bridge.read_clipboard),'https://www.jiosaavn.com/song/a/token')
+
+    def test_custom_destination_uses_selected_tree(self):
+        cached=android_bridge.initialize()
+        helper=Mock()
+        helper.getDestination.return_value='{"uri":"content://tree/test","label":"My music","path":"Internal storage/Documents/My music"}'
+        helper.exportToFolder.return_value='song.m4a'
+        cached['NativeUi']=helper
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'song.m4a';path.write_bytes(b'audio')
+            result=self.run_worker(lambda:storage.publish(path,True,'SaavnDl','Album/Disc 1'))
+            self.assertFalse(path.exists())
+            self.assertEqual(result,'Internal storage/Documents/My music/Album/Disc 1/song.m4a')
+            helper.exportToFolder.assert_called_once_with(str(path),'Album/Disc 1','audio/mp4')
+
+    def test_custom_destination_failure_keeps_source(self):
+        cached=android_bridge.initialize()
+        helper=Mock()
+        helper.getDestination.return_value='{"uri":"content://tree/test","label":"My music","path":"My music"}'
+        helper.exportToFolder.side_effect=OSError('Provider denied write access')
+        cached['NativeUi']=helper
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/'song.m4a';path.write_bytes(b'audio')
+            with self.assertRaises(OSError):self.run_worker(lambda:storage.publish(path,True))
+            self.assertTrue(path.exists())
 
 
 if __name__=='__main__':

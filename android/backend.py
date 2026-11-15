@@ -8,6 +8,7 @@ from urllib.parse import urlparse, unquote
 import requests
 from mutagen.mp4 import MP4, MP4Cover
 from settings import DEFAULTS
+from filenames import track_name
 
 API = 'https://www.jiosaavn.com/api.php'
 
@@ -22,7 +23,7 @@ def clean(value):
 
 def safe_name(value):
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', clean(value)).strip(' .')
-    return name[:110] or 'Untitled'
+    return name.encode('utf-8')[:180].decode('utf-8','ignore') or 'Untitled'
 
 
 def parse_link(url):
@@ -116,15 +117,12 @@ class Client:
             raise ValueError('The service returned an unsupported audio URL.')
         return media_url
 
-    def download(self, song, directory, cancel, progress, settings=None, number=1):
+    def download(self, song, directory, cancel, progress, settings=None, number=1, context='single', album_artist=None):
         settings = {**DEFAULTS, **(settings or {})}
         if cancel.is_set():
             raise Cancelled()
         media_url = self.media_url(song, settings['quality'])
-        title = safe_name(song.get('song'))
-        artist = safe_name(song.get('primary_artists'))
-        style = settings['naming']
-        name = title if style == 'title' else (f'{number:02d}. {title}' if style == 'track_title' else f'{title} - {artist}')
+        name = track_name(song,settings,number,context,album_artist)
         target = Path(directory) / (name + '.m4a')
         suffix = 2
         while target.exists():

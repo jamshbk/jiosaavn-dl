@@ -1,6 +1,8 @@
 'use strict';
+if(!Element.prototype.replaceChildren)Element.prototype.replaceChildren=function(...nodes){while(this.firstChild)this.removeChild(this.firstChild);for(const item of nodes)this.appendChild(item instanceof Node?item:document.createTextNode(String(item)));};
 const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="app-token"]').content;
+let destination = {uri:'',path:'Downloads',pending:false}, destinationTimer;
 let prefs = {}, current = null, query = '', page = 1, busy = false, downloading = false;
 let selected = new Set(), returning = 'home', playing = null, playSequence = 0;
 let showJob = false, jobPolling = false, settingsQueue = Promise.resolve(), toastTimer;
@@ -131,7 +133,7 @@ async function startDownload(keys,bundle) {
   try {showJob=true;renderJob(await api('download',{keys,bundle}));$('job').scrollIntoView({block:'nearest',behavior:'smooth'});}
   catch(error){downloading=false;disableDownloads();toast(error.message);}
 }
-function disableDownloads(){document.querySelectorAll('[data-download]').forEach(b=>b.disabled=downloading);selectionState();}
+function disableDownloads(){document.querySelectorAll('[data-download]').forEach(b=>b.disabled=downloading);selectionState();renderDestination();}
 function renderJob(job){
   if(job.active)showJob=true;
   downloading=!!job.active;disableDownloads();
@@ -147,16 +149,39 @@ function renderJob(job){
 $('cancel').onclick=async()=>{try{await api('cancel',{});$('job-message').textContent='Cancelling…';}catch(e){toast(e.message);}};
 $('dismiss-job').onclick=()=>{showJob=false;$('job').hidden=true;};
 async function poll(){if(jobPolling)return;jobPolling=true;try{renderJob(await api('job'));}catch(_){}finally{jobPolling=false;}}
+function renderFilenamePreviews(){
+  const samples={title:'Track title',artist:'Artist',albumArtist:'Album artist',album:'Album title',year:'2026',track:'03',disc:'2',id:'SongID',language:'Hindi'};
+  document.querySelectorAll('[data-preview]').forEach(label=>{
+    const key=label.dataset.preview, control=document.querySelector('[data-setting="'+key+'"]');
+    let text=(control.value||'').replace(/\{([A-Za-z]+)\}/g,(whole,key)=>samples[key]||whole);
+    text=text.replace(/[<>:"/\\|?*]/g,'_').replace(/\.(m4a|aac|zip)$/i,'');
+    label.textContent=text+(key==='album_zip_template'?'.zip':'.m4a');
+  });
+}
+function renderDestination(){
+  $('destination-path').value=destination.uri?destination.path:'Downloads/'+(prefs.folder||'SaavnDl');
+  $('choose-folder').disabled=downloading||destination.pending;
+  $('default-folder').disabled=downloading||destination.pending||!destination.uri;
+  $('reset').disabled=downloading||destination.pending;
+  $('folder').disabled=!!destination.uri;
+  $('destination-status').textContent=destination.error||(destination.pending?'Choose a folder in the Android picker…':destination.uri?'Custom location saved. Album and disc folders are created inside it.':'Choose a folder on your phone or SD card. Your choice is remembered.');
+}
+async function loadDestination(){try{destination=await api('destination');renderDestination();}catch(error){$('destination-status').textContent=error.message;}}
+$('choose-folder').onclick=async()=>{
+  try{destination=await api('folder/pick',{});renderDestination();clearInterval(destinationTimer);destinationTimer=setInterval(async()=>{await loadDestination();if(!destination.pending)clearInterval(destinationTimer);},900);}
+  catch(error){toast(error.message);}
+};
+$('default-folder').onclick=async()=>{try{destination=await api('folder/default',{});renderDestination();}catch(error){toast(error.message);}};
 function populateSettings(){
   document.querySelectorAll('[data-setting]').forEach(control=>{const v=prefs[control.dataset.setting];if(control.type==='checkbox')control.checked=!!v;else control.value=v || '';});
-  $('player-quality').value=prefs.quality || '320';qualityNote();
+  $('player-quality').value=prefs.quality || '320';qualityNote();renderFilenamePreviews();renderDestination();
 }
 function saveSetting(key,value){
   $('settings-status').textContent='Saving…';
   settingsQueue=settingsQueue.catch(()=>{}).then(async()=>{
     try {
       prefs=await api('settings',{patch:{[key]:value}});
-      $('settings-status').textContent='Changes save automatically.';
+      $('settings-status').textContent='Changes save automatically.';renderFilenamePreviews();renderDestination();
       if(key==='quality'){
         document.querySelector('[data-setting="quality"]').value=prefs.quality;
         $('player-quality').value=prefs.quality;qualityNote();
@@ -165,10 +190,13 @@ function saveSetting(key,value){
     }catch(error){$('settings-status').textContent=error.message;populateSettings();toast(error.message);}
   });return settingsQueue;
 }
-document.querySelectorAll('[data-setting]').forEach(control=>control.onchange=()=>saveSetting(control.dataset.setting,control.type==='checkbox'?control.checked:control.value));
+document.querySelectorAll('[data-setting]').forEach(control=>{
+  control.onchange=()=>saveSetting(control.dataset.setting,control.type==='checkbox'?control.checked:control.value);
+  if(control.dataset.setting.endsWith('_template'))control.addEventListener('input',renderFilenamePreviews);
+});
 $('reset').onclick=()=>{
   settingsQueue=settingsQueue.catch(()=>{}).then(async()=>{
-    try{const was=prefs.quality;prefs=await api('settings',{reset:true});populateSettings();$('settings-status').textContent='Default settings restored.';toast('Defaults restored.');if(playing&&was!==prefs.quality)await playSong(playing,true);}
+    try{const was=prefs.quality;prefs=await api('settings',{reset:true});if(destination.uri)destination=await api('folder/default',{});populateSettings();$('settings-status').textContent='Default settings restored.';toast('Defaults restored.');if(playing&&was!==prefs.quality)await playSong(playing,true);}
     catch(error){toast(error.message);}
   });
 };
@@ -192,5 +220,16 @@ async function playSong(song,resume=false){
 $('audio').onerror=()=>{if(playing)$('player-status').textContent='Audio could not load. Try another quality or song.';};
 $('player-quality').onchange=event=>saveSetting('quality',event.target.value);
 $('close-player').onclick=()=>{++playSequence;playing=null;$('audio').pause();$('audio').removeAttribute('src');$('audio').load();$('player').hidden=true;};
-async function init(){renderScreen();try{prefs=await api('settings');populateSettings();await poll();}catch(error){message(error.message);}setInterval(poll,1000);}
+const splashStarted=performance.now();
+let splashDismissed=false;
+function dismissSplash(){if(splashDismissed)return;splashDismissed=true;$('splash').classList.add('leaving');setTimeout(()=>$('splash').hidden=true,350);}
+setTimeout(dismissSplash,4500);
+async function init(){
+  renderScreen();
+  try{prefs=await api('settings');populateSettings();await Promise.all([poll(),loadDestination()]);}
+  catch(error){message(error.message);}
+  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(dismissSplash,Math.max(0,(reduced?150:1450)-(performance.now()-splashStarted)));
+  setInterval(poll,1000);
+}
 init();
