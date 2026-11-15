@@ -6,6 +6,7 @@ let destination = {uri:'',path:'Downloads',pending:false}, destinationTimer;
 let prefs = {}, current = null, query = '', page = 1, busy = false, downloading = false;
 let selected = new Set(), returning = 'home', playing = null, playSequence = 0;
 let showJob = false, jobPolling = false, settingsQueue = Promise.resolve(), toastTimer;
+let searchType = 'tracks', searchResults = null;
 const icons = {
   play:'<svg viewBox="0 0 24 24"><path d="m9 5 11 7-11 7z"/></svg>',
   download:'<svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"/></svg>'
@@ -43,9 +44,22 @@ document.querySelectorAll('[data-open-settings]').forEach(button => button.addEv
   returning = !$('details').hidden ? 'details' : 'home'; navigate('settings');
 }));
 $('settings-back').onclick = () => navigate(returning);
-$('details-back').onclick = () => navigate('home');
+$('details-back').onclick = () => {
+  if(searchResults && current.kind==='album') {
+    current=searchResults;searchResults=null;selected.clear();renderCollection();message('');window.scrollTo(0,0);
+  } else navigate('home');
+};
 function message(text) { $('home-status').textContent = text; $('detail-status').textContent = text; }
-function setBusy(value) { busy = value; $('archive').disabled = value; $('archive').textContent = value ? 'Loading…' : 'Archive'; $('query').disabled = value; $('paste').disabled = value; }
+function setBusy(value) { busy = value; $('archive').disabled = value; $('archive').textContent = value ? 'Loading…' : 'Archive'; $('query').disabled = value; $('paste').disabled = value; document.querySelectorAll('[data-search-type], [data-open-album]').forEach(b=>b.disabled=value); }
+function renderSearchType(){
+  document.querySelectorAll('[data-search-type]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.searchType===searchType)));
+  $('search-hint').textContent=searchType==='albums'?'Search albums, then open one to view its songs. Links open directly.':'Search for tracks, or paste a song, album or playlist link.';
+}
+document.querySelectorAll('[data-search-type]').forEach(button=>button.onclick=()=>{
+  if(busy || searchType===button.dataset.searchType)return;
+  searchType=button.dataset.searchType;renderSearchType();
+  if(!$('details').hidden && current && ['search','album-search'].includes(current.kind)){$('query').value=query;archive();}
+});
 function duration(seconds) { const n = Math.max(0,Number(seconds)||0); return Math.floor(n/60) + ':' + String(Math.floor(n%60)).padStart(2,'0'); }
 function node(tag, className, text) { const n = document.createElement(tag); if(className) n.className = className; if(text !== undefined) n.textContent = text; return n; }
 function art(url, title) {
@@ -59,12 +73,12 @@ async function archive(nextPage=1) {
   if (busy) return;
   const value = $('query').value.trim();
   if (!value) { message('Enter a song name, artist or link.'); $('query').focus(); return; }
-  setBusy(true); message('Finding song details…');
+  setBusy(true); message(searchType==='albums'?'Finding albums…':'Finding tracks…');
   try {
-    const info = await api('archive', {query:value,page:nextPage});
-    current = info; query = value; page = nextPage;
-    selected = new Set(info.kind === 'search' ? [] : info.songs.map(s => s.key));
-    renderCollection(); navigate('details'); message(info.songs.length ? '' : 'No songs found. Try a different name.');
+    const info = await api('archive', {query:value,page:nextPage,search_type:searchType});
+    current = info; query = value; page = nextPage;searchResults=null;
+    selected = new Set(['search','album-search'].includes(info.kind) ? [] : info.songs.map(s => s.key));
+    renderCollection(); navigate('details'); message((info.kind==='album-search'?info.albums:info.songs).length ? '' : info.kind==='album-search'?'No albums found. Try a different name.':'No tracks found. Try a different name.');
   } catch(error) { message(error.message); toast(error.message); }
   finally { setBusy(false); }
 }
@@ -78,9 +92,23 @@ $('paste').onclick = async () => {
     $('query').value = text.trim(); $('query').focus(); message('Link pasted. Tap Archive to see details.');
   } catch(error) { toast(error.message); }
 };
+async function openAlbum(album){
+  if(busy)return;
+  const results=current;setBusy(true);message('Opening album…');
+  try{
+    const info=await api('archive',{query:album.url});
+    if(info.kind!=='album')throw new Error('This result is not an album. Please search again.');
+    searchResults=results;current=info;selected=new Set(info.songs.map(s=>s.key));
+    renderCollection();message('');window.scrollTo(0,0);
+  }catch(error){message(error.message);toast(error.message);}
+  finally{setBusy(false);}
+}
 function renderCollection() {
-  const search = current.kind === 'search', single = current.kind === 'song';
-  $('details-heading').textContent = search ? 'Search results' : single ? 'Song details' : current.kind === 'album' ? 'Album details' : 'Playlist details';
+  const albumSearch=current.kind==='album-search', search = current.kind === 'search' || albumSearch, single = current.kind === 'song';
+  const items=albumSearch?current.albums:current.songs;
+  $('details-heading').textContent = albumSearch?'Album results':search ? 'Search results' : single ? 'Song details' : current.kind === 'album' ? 'Album details' : 'Playlist details';
+  $('details-back').setAttribute('aria-label',searchResults?'Back to album results':'Back to home');
+  $('result-modes').hidden=!search;renderSearchType();
   const container = $('collection'); container.replaceChildren();
   if (!search) container.append(art(current.image, current.title));
   const info = node('div','collection-info');
@@ -88,10 +116,22 @@ function renderCollection() {
   info.append(node('h2','',current.title));
   if(current.artist) info.append(node('p','',current.artist));
   const total = current.songs.reduce((sum,s) => sum + s.duration,0);
-  info.append(node('p','',[current.year, current.songs.length + (current.songs.length === 1 ? ' song' : ' songs'), !search && total ? duration(total) : ''].filter(Boolean).join(' · ')));
+  info.append(node('p','',[current.year, items.length + (albumSearch?(items.length===1?' album':' albums'):(items.length === 1 ? ' song' : ' songs')), !search && total ? duration(total) : ''].filter(Boolean).join(' · ')));
   container.append(info);
   $('selection-tools').hidden = search || single;
   $('download-selected').hidden = search;
+  $('download-album-zip').hidden=current.kind!=='album';
+  $('download-album-zip').disabled=downloading || !current.songs.length;
+  $('quality-note').hidden=albumSearch;
+  $('tracks').hidden=albumSearch;$('albums').hidden=!albumSearch;$('albums').replaceChildren();
+  if(albumSearch)for(const album of current.albums){
+    const card=node('button','album-card');card.type='button';card.dataset.openAlbum='true';
+    card.setAttribute('aria-label','Open album '+album.title);card.append(art(album.image,album.title));
+    const text=node('div','album-info');text.append(node('h3','',album.title));
+    if(album.artist)text.append(node('p','',album.artist));
+    text.append(node('p','',album.year||'Album'));card.append(text,node('span','album-arrow','›'));
+    card.onclick=()=>openAlbum(album);$('albums').append(card);
+  }
   $('tracks').replaceChildren();
   for(const song of current.songs) {
     const row = node('article','track'); row.dataset.key = song.key;
@@ -112,7 +152,7 @@ function renderCollection() {
     actions.append(play,download);row.append(actions);$('tracks').append(row);
   }
   $('pagination').hidden=!search;
-  $('previous').disabled=page<=1; $('next').disabled=current.songs.length<20;
+  $('previous').disabled=page<=1; $('next').disabled=items.length<20;
   $('page-number').textContent='Page ' + page;
   qualityNote(); selectionState();
 }
@@ -124,13 +164,14 @@ function selectionState() {
 $('select-all').onclick=()=>{selected=new Set(current.songs.map(s=>s.key));renderCollection();};
 $('select-none').onclick=()=>{selected.clear();renderCollection();};
 $('download-selected').onclick=()=>startDownload([...selected],true);
+$('download-album-zip').onclick=()=>startDownload(current.songs.map(s=>s.key),true,true);
 $('previous').onclick=()=>{if(!busy){$('query').value=query;archive(page-1);}};
 $('next').onclick=()=>{if(!busy){$('query').value=query;archive(page+1);}};
-async function startDownload(keys,bundle) {
+async function startDownload(keys,bundle,forceZip=false) {
   if(downloading) return toast('A download is already running.');
   if(!keys.length) return toast('Select at least one song.');
   downloading=true; disableDownloads();
-  try {showJob=true;renderJob(await api('download',{keys,bundle}));$('job').scrollIntoView({block:'nearest',behavior:'smooth'});}
+  try {showJob=true;renderJob(await api('download',{keys,bundle,...(forceZip?{format:'zip'}:{})}));$('job').scrollIntoView({block:'nearest',behavior:'smooth'});}
   catch(error){downloading=false;disableDownloads();toast(error.message);}
 }
 function disableDownloads(){document.querySelectorAll('[data-download]').forEach(b=>b.disabled=downloading);selectionState();renderDestination();}

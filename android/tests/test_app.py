@@ -38,6 +38,18 @@ class PreferencesTests(unittest.TestCase):
 
 
 class BackendTests(unittest.TestCase):
+    def test_album_search_returns_only_safe_album_links_and_metadata(self):
+        client = backend.Client()
+        client.api = Mock(return_value={'results':[
+            {'title':'Album &amp; One','music':'Artist','year':'2024','perma_url':'https://www.jiosaavn.com/album/one/token'},
+            {'title':'Track','perma_url':SONG['perma_url']},
+            {'title':'Bad','perma_url':'https://example.com/album/one/token'},
+        ]})
+        albums=client.search_albums('One',2)
+        self.assertEqual([a['title'] for a in albums],['Album & One'])
+        self.assertEqual(albums[0]['artist'],'Artist')
+        client.api.assert_called_once_with('search.getAlbumResults',q='One',p=2,n=20,api_version=4,ctx='web6dot0')
+
     def test_preview_resolves_metadata_without_downloading(self):
         client = backend.Client()
         client.api = Mock(return_value={'title':'Album &amp; More', 'songs':[SONG], 'year':'2024'})
@@ -110,6 +122,41 @@ class BackendTests(unittest.TestCase):
 
 
 class ApiTests(unittest.TestCase):
+    def test_album_search_does_not_mix_in_track_search_results(self):
+        with patch.object(main,'Client') as cls:
+            cls.return_value.search_albums.return_value=[{'title':'Album','url':'https://www.jiosaavn.com/album/a/t'}]
+            result=self.request('/api/archive',{'query':'Artist','search_type':'albums','page':2}).args[0]
+            self.assertEqual(result['kind'],'album-search')
+            self.assertEqual(result['songs'],[])
+            self.assertEqual(len(result['albums']),1)
+            cls.return_value.search.assert_not_called()
+            cls.return_value.search_albums.assert_called_once_with('Artist',2)
+
+    def test_explicit_zip_works_for_one_song_with_zip_setting_off(self):
+        key=main.register([SONG],'An Album','album')[0]['key']
+        with tempfile.TemporaryDirectory() as d, patch.object(main,'PREFS',Settings(Path(d)/'prefs.json')), patch.object(main.threading,'Thread') as thread:
+            main.PREFS.save({'zip_album':False})
+            main.status(active=False)
+            try:
+                result=self.request('/api/download',{'keys':[key],'bundle':True,'format':'zip'}).args[0]
+                self.assertTrue(result['active'])
+                self.assertIs(thread.call_args.kwargs['args'][2],True)
+            finally:
+                main.status(active=False)
+
+    def test_single_song_zip_contains_only_requested_album_track(self):
+        record={'song':SONG,'number':1,'collection':'Only This Album','context':'album'}
+        def fake_download(song,directory,*args,**kwargs):
+            path=Path(directory)/'Only Track.m4a';path.write_bytes(b'audio');return path,[]
+        with tempfile.TemporaryDirectory() as d, patch.object(main,'DATA',Path(d)), patch.object(main,'Client') as cls:
+            cls.return_value.download.side_effect=fake_download
+            main.CANCEL.clear()
+            main.download_worker([record],{**DEFAULTS,'zip_album':False},True)
+            archives=list((Path(d)/'Downloads').rglob('*.zip'))
+            self.assertEqual(len(archives),1)
+            with main.zipfile.ZipFile(archives[0]) as archive:
+                self.assertEqual(archive.namelist(),['Only This Album/Only Track.m4a'])
+
     def request(self, path, data, token=None):
         handler = main.Handler.__new__(main.Handler)
         content = json.dumps(data).encode()

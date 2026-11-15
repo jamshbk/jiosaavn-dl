@@ -75,6 +75,27 @@ class Client:
             raise ValueError('Search response format has changed.')
         return [s for s in songs if isinstance(s, dict) and s.get('perma_url')]
 
+    def search_albums(self, query, page=1):
+        data = self.api('search.getAlbumResults', q=query, p=page, n=20, api_version=4, ctx='web6dot0')
+        results = data.get('results', [])
+        if not isinstance(results, list):
+            raise ValueError('Album search response format has changed.')
+        albums = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            link = item.get('perma_url') or ''
+            try:
+                if parse_link(link)[0] != 'album':
+                    continue
+            except (ValueError, TypeError):
+                continue
+            albums.append({'title': clean(item.get('title') or item.get('name') or item.get('album')),
+                           'artist': clean(item.get('primary_artists') or item.get('music') or item.get('subtitle') or item.get('description')),
+                           'year': clean(item.get('year') or (item.get('more_info') or {}).get('year')), 'image': item.get('image') or '',
+                           'url': link})
+        return albums
+
     def resolve(self, link):
         kind, token = parse_link(link)
         data = self.api('webapi.get', token=token, type=kind, n=1000)

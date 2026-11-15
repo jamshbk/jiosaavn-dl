@@ -28,6 +28,14 @@
         <button id="paste" type="button" class="paste" aria-label="Paste from clipboard"><svg viewBox="0 0 24 24"><rect x="8" y="6" width="11" height="15" rx="2"/><path d="M15 6V3H5v15h3"/></svg></button>
         <button id="archive" class="primary" type="submit">Archive</button>
       </form>
+      <div class="search-options" aria-label="Search options">
+        <span class="search-label">SEARCH IN</span>
+        <div class="search-modes" role="group" aria-label="Search type">
+          <button type="button" data-search-type="albums" aria-pressed="false">Albums</button>
+          <button type="button" data-search-type="tracks" aria-pressed="true">Tracks</button>
+        </div>
+      </div>
+      <p id="search-hint" class="search-hint">Search for tracks, or paste a song, album or playlist link.</p>
     </section>
     <p id="home-status" class="status" role="status" aria-live="polite">Ready.</p>
   </div></main>
@@ -38,12 +46,17 @@
   <header class="page-header"><button id="details-back" class="icon-button" aria-label="Back to home">←</button><h1 id="details-heading">Details</h1><button class="icon-button" data-open-settings aria-label="Open settings">⚙</button></header>
   <main class="content">
     <section id="collection" class="collection panel"></section>
+    <div id="result-modes" class="result-modes" role="group" aria-label="Result type" hidden>
+      <div class="search-modes"><button type="button" data-search-type="albums" aria-pressed="false">Albums</button><button type="button" data-search-type="tracks" aria-pressed="true">Tracks</button></div>
+    </div>
+    <button id="download-album-zip" class="secondary full album-zip" data-download="true" hidden>Download album ZIP</button>
     <div id="selection-tools" class="selection-tools" hidden>
       <button id="select-all" class="text-button">Select all</button><button id="select-none" class="text-button">Clear</button><span id="selected-count"></span>
     </div>
     <button id="download-selected" class="primary full" hidden>Download selected</button>
     <p id="quality-note" class="muted small"></p>
     <div id="tracks" class="tracks"></div>
+    <div id="albums" class="albums" hidden></div>
     <nav id="pagination" class="pagination" hidden><button id="previous" class="secondary">Previous</button><span id="page-number"></span><button id="next" class="secondary">Next</button></nav>
     <p id="detail-status" class="status" role="status" aria-live="polite"></p>
   </main>

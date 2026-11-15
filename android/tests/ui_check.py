@@ -23,6 +23,9 @@ CALLS=[]
 class FixtureClient:
     def search(self, query, page=1):
         return SONGS
+    def search_albums(self,query,page=1):
+        return [{'title':'Evening Sessions','artist':'Example Artist','year':'2024','image':'','url':'https://www.jiosaavn.com/album/evening/token'},
+                {'title':'Other Album','artist':'Other Artist','year':'2023','image':'','url':'https://www.jiosaavn.com/album/other/token'}]
     def resolve(self, link):
         return {'kind':'album', 'title':'Evening Sessions','artist':'Example Artist',
                 'year':'2024','image':'','songs':SONGS}
@@ -102,6 +105,35 @@ def check():
                 page.locator('#archive').click()
                 expect(page.locator('#details-heading')).to_have_text('Search results')
                 expect(page.locator('#tracks .track')).to_have_count(2)
+                page.locator('#result-modes [data-search-type="albums"]').click()
+                expect(page.locator('#details-heading')).to_have_text('Album results')
+                expect(page.locator('#albums .album-card')).to_have_count(2)
+                expect(page.locator('#tracks')).to_be_hidden()
+                for width,height in [(320,640),(393,852),(740,360)]:
+                    page.set_viewport_size({'width':width,'height':height})
+                    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),f'Album results overflow at {width}'
+                page.set_viewport_size({'width':393,'height':852})
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(outputs/'album-search-393.png'),full_page=True)
+                page.get_by_role('button',name='Open album Evening Sessions',exact=True).click()
+                expect(page.locator('#details-heading')).to_have_text('Album details')
+                expect(page.locator('#tracks .track')).to_have_count(2)
+                expect(page.locator('#albums')).to_be_hidden()
+                expect(page.locator('#collection')).to_contain_text('Evening Sessions')
+                expect(page.locator('#collection')).not_to_contain_text('Other Album')
+                main.PREFS.save({'zip_album':False})
+                page.locator('#select-none').click()
+                page.locator('#download-album-zip').click()
+                expect(page.locator('#job-message')).to_have_text('Saved 2 songs.',timeout=10000)
+                archives=list(Path(d).rglob('*.zip'))
+                assert len(archives)==1,archives
+                with main.zipfile.ZipFile(archives[0]) as archive:
+                    assert sorted(Path(n).name for n in archive.namelist())==['one.m4a','two.m4a']
+                page.wait_for_timeout(300)
+                page.screenshot(path=str(outputs/'album-zip-393.png'),full_page=True)
+                page.locator('#details-back').click()
+                expect(page.locator('#details-heading')).to_have_text('Album results')
+                expect(page.locator('#albums .album-card')).to_have_count(2)
                 assert not errors, errors
                 browser.close()
         finally:

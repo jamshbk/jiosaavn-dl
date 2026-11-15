@@ -1,4 +1,4 @@
-name: Build SaavnDl 1.0 startup fix
+name: Build SaavnDl 1.0 album search
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -46,6 +46,18 @@ jobs:
           python -m pip install 'buildozer==1.5.0' 'Cython==0.29.36' setuptools requests mutagen playwright
       - name: Check backend and Android bridge
         run: python -m unittest discover -s tests -v
+      - name: Check live album lookup
+        if: matrix.arch == 'arm64-v8a'
+        run: |
+          python - <<'PYLIVE'
+          from backend import Client
+          client=Client()
+          albums=client.search_albums('Do Pal')
+          assert albums, 'No albums returned for live lookup'
+          album=client.resolve(albums[0]['url'])
+          assert album['kind']=='album' and album['songs']
+          print('PASS: live album search and selected-album track lookup')
+          PYLIVE
       - name: Check responsive screens and app flow
         if: matrix.arch == 'arm64-v8a'
         run: |
@@ -84,15 +96,15 @@ jobs:
               assert 'startup-logo.png' in loader
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
               assert '.splash' in z.read('assets/startup-style.css').decode()
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-startup-fix.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-albums.apk')
           PY
-          sha256sum SaavnDl-v1.0-startup-fix.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-albums.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-startup-fix.apk
+            android/SaavnDl-v1.0-albums.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -157,4 +169,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0-startup-fix apk/SaavnDl-v1.0-startup-fix.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — startup fix' --notes 'SaavnDl 1.0 startup fix: replaced the white Python/WebView loader with the original dark animated SaavnDl splash from the first WebView frame. Version remains 1.0; Android version code 1001. Android 10 and 15 emulator checks pass before publishing. ARM64, Android 10+.'
+          gh release create saavndl-v1.0-albums apk/SaavnDl-v1.0-albums.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — album search and ZIP' --notes 'SaavnDl 1.0: Tracks / Albums search selector, album results open only that album, and a dedicated Download album ZIP action that works independently of the ZIP preference, including one-track albums. Keeps native safe layout, custom folders and dark startup branding. Android 10+, ARM64. Version code 1002.'

@@ -246,6 +246,12 @@ class Handler(BaseHTTPRequestHandler):
                     info['songs'] = register(info['songs'], info['title'] if info['kind'] != 'song' else '',info['kind'],info.get('artist',''))
                     return self.respond(info)
                 page = max(1, min(int(body.get('page') or 1), 500))
+                search_type = body.get('search_type', 'tracks')
+                if search_type not in ('tracks', 'albums'):
+                    raise ValueError('Choose Tracks or Albums.')
+                if search_type == 'albums':
+                    return self.respond({'kind': 'album-search', 'title': query,
+                                         'albums': client.search_albums(query, page), 'songs': [], 'page': page})
                 songs = register(client.search(query, page))
                 return self.respond({'kind': 'search', 'title': query, 'songs': songs, 'page': page})
             if path == '/api/clipboard':
@@ -294,7 +300,10 @@ class Handler(BaseHTTPRequestHandler):
                         from storage import get_destination
                         destination=get_destination()
                         options['_destination']=destination.get('path',destination['label']) if destination.get('uri') else 'Downloads/'+options['folder']
-                    bundle = len(records) > 1 and body.get('bundle') is True and options['zip_album']
+                    output_format = body.get('format')
+                    if output_format not in (None, 'zip'):
+                        raise ValueError('Unsupported download format.')
+                    bundle = output_format == 'zip' or (len(records) > 1 and body.get('bundle') is True and options['zip_album'])
                     CANCEL.clear()
                     status(active=True, message='Starting download…', progress=0, saved=0,
                            failed=0, errors=[], warnings=[], destination='', detail='')
