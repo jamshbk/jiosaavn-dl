@@ -14,11 +14,14 @@ def adb(*args, check=True):
 
 apk=Path('android/SaavnDl-v1.0-debug.apk')
 adb('install','-r',str(apk))
+# Cold-boot system overlays can still be applying after sys.boot_completed.
+time.sleep(20)
 adb('logcat','-c')
 adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity',
     '--ez','saavn_native_test','true')
 deadline=time.monotonic()+120
 success=False
+restarted=False
 while time.monotonic()<deadline:
     log=adb('logcat','-d')
     if 'SAAVN_NATIVE_CHECK_FAILED' in log:
@@ -26,10 +29,14 @@ while time.monotonic()<deadline:
     if 'SAAVN_NATIVE_CHECK_OK' in log:
         success=True
         break
+    if not restarted and not adb('shell','pidof','org.example.saavnpocket',check=False).strip():
+        time.sleep(3)
+        adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity','--ez','saavn_native_test','true')
+        restarted=True
     time.sleep(2)
 Path('android/native-check-result.txt').write_text('PENDING additional checks' if success else 'FAIL',encoding='utf-8')
 if not success:
-    lines=[line for line in log.splitlines() if any(s in line for s in ('python','Python','FATAL','SAAVN_'))]
+    lines=[line for line in log.splitlines() if any(s in line for s in ('python','Python','FATAL','SAAVN_','AndroidRuntime','libc','DEBUG','am_crash'))]
     raise SystemExit('Android native storage check failed:\n'+'\n'.join(lines[-100:]))
 adb('forward','tcp:5051','tcp:5000')
 for attempt in range(30):
@@ -80,7 +87,21 @@ check_insets('portrait-restored')
 overlays=adb('shell','cmd','overlay','list',check=False)
 if 'com.android.internal.systemui.navbar.gestural' in overlays:
     adb('shell','cmd','overlay','enable-exclusive','--category','com.android.internal.systemui.navbar.gestural',check=False)
-    time.sleep(3)
+    # Applying a system resource overlay may recreate the process. Reopen the
+    # app, as a user does after changing Android navigation settings.
+    time.sleep(5)
+    adb('shell','am','force-stop','org.example.saavnpocket')
+    adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity','--ez','saavn_native_test','true')
+    for attempt in range(45):
+        try:
+            response=requests.get('http://127.0.0.1:5051/',timeout=2)
+            token=re.search(r'name="app-token" content="([^"]+)"',response.text).group(1)
+            headers['X-App-Token']=token
+            api('device')
+            break
+        except Exception:
+            if attempt==44:raise
+            time.sleep(1)
     check_insets('gesture-navigation')
 
 # Select a real folder through Android's own picker, then verify its persisted grant.
