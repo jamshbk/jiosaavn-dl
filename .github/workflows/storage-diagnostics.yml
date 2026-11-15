@@ -10,13 +10,36 @@ jobs:
   inspect:
     runs-on: ubuntu-22.04
     steps:
-      - name: Collect compiler error
+      - name: Classify failure without exporting log contents
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/jamshbk/jiosaavn-dl/actions/jobs/132776004529/logs > full-build.log
-          tail -n 350 full-build.log > failure-tail.log
-      - uses: actions/upload-artifact@v4
-        with:
-          name: storage-build-diagnostics
-          path: failure-tail.log
+          gh api repos/jamshbk/jiosaavn-dl/actions/jobs/132776004529/logs --allow-escape-sequences > "$RUNNER_TEMP/compiler.log"
+          python - <<'PY'
+          from pathlib import Path
+          import os, json
+          text=Path(os.environ['RUNNER_TEMP'],'compiler.log').read_text(errors='replace')
+          tail=text[-100000:].lower()
+          patterns={
+            'DISK_FULL':'no space left on device',
+            'OUT_OF_MEMORY':'killed signal terminated program',
+            'CROSS_BINARY_EXECUTION':'cannot execute binary file',
+            'MISSING_FILE':'no such file or directory',
+            'CYTHON_ERROR':'cython.compiler.errors.compileerror',
+            'UNDEFINED_SYMBOL':'undefined reference',
+            'CONFIGURE_ERROR':'configure: error:',
+            'PYTHON_EXCEPTION':'traceback (most recent call last)',
+            'PIP_INSTALL_ERROR':'could not build wheels',
+            'COMPILER_ERROR':'fatal error:',
+            'PATCH_ERROR':'hunk #1 failed',
+            'GRADLE_FAILED':'failure: build failed',
+            'NO_APK':'no apks',
+            'NETWORK_ERROR':'temporary failure in name resolution',
+            'NO_BOOTSTRAP':'no usable bootstrap',
+            'PYTHON_BUILD_FATAL':'fatal python error',
+          }
+          print(json.dumps({key:value in tail for key,value in patterns.items()}))
+          recipes=['python3','pyjnius','openssl','libffi','genericndkbuild']
+          print(json.dumps({'last_recipe_category':max(recipes,key=lambda key:tail.rfind('building '+key)) if any('building '+key in tail for key in recipes) else 'unknown'}))
+          PY
+          rm -f "$RUNNER_TEMP/compiler.log"
