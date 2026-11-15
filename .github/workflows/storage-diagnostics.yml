@@ -41,5 +41,11 @@ jobs:
           print(json.dumps({key:value in tail for key,value in patterns.items()}))
           recipes=['python3','pyjnius','openssl','libffi','genericndkbuild']
           print(json.dumps({'last_recipe_category':max(recipes,key=lambda key:tail.rfind('building '+key)) if any('building '+key in tail for key in recipes) else 'unknown'}))
+          import re
+          allowed=['TypeError','ValueError','RuntimeError','AssertionError','AttributeError','ImportError','ModuleNotFoundError','KeyError','IndexError','FileNotFoundError','FileExistsError','PermissionError','OSError','ErrorReturnCode_1','ErrorReturnCode_2','BuildInterruptingException','CalledProcessError']
+          print(json.dumps({'exception_categories':[key for key in allowed if key+':' in tail]}))
+          public_modules={'bootstrap.py','toolchain.py','recipe.py','build.py','__init__.py','android.py','sh.py','util.py','pythonforandroid.py','logger.py','archs.py'}
+          frames=re.findall(r'File "([^"]+)", line (\d+)',text[-100000:])
+          print(json.dumps({'public_frame_lines':[{'module':Path(p).name,'line':int(n)} for p,n in frames if Path(p).name in public_modules][-12:]}))
           PY
           rm -f "$RUNNER_TEMP/compiler.log"
