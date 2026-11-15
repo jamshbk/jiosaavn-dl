@@ -73,5 +73,17 @@ jobs:
           vocabulary.update('can cannot installation externally only managed user site packages are is were was this that the to of for in on with by from a an as at has have had must may should need needs require requirements requirement expected got invalid incompatible ignore installed installing using try add option options argument arguments value values passed already does do because when if during while creating generation file directory exists name unknown such enable disabled checking requested without available virtualenv specify custom indexes index config configuration configurationfile invalidoption candidate running multiple settings setting key name duplicate record support target sources source mode allow escape sequences output terminal contains response sequences anyway'.split())
           cleaned=re.sub(r'\x1b\[[0-9;]*m','',text)
           print(json.dumps({'fixed_vocabulary_error_sentences':[' '.join(word for word in re.findall(r'[a-z_][a-z_0-9]*',line.lower()) if word in vocabulary) for line in cleaned.splitlines() if 'error:' in line.lower()][-12:]}))
+          import ast, pip
+          identifiers={'__version__','main','_vendor','_internal'}
+          for source in Path(pip.__file__).parent.rglob('*.py'):
+              try:
+                  tree=ast.parse(source.read_text(errors='replace'))
+                  for item in ast.walk(tree):
+                      if isinstance(item,ast.Name): identifiers.add(item.id)
+                      elif isinstance(item,ast.Attribute): identifiers.add(item.attr)
+                      elif isinstance(item,(ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)): identifiers.add(item.name)
+              except (SyntaxError,OSError): pass
+          matches=re.findall(r'cannot import name [\\\'"]([A-Za-z_][A-Za-z_0-9]*)[\\\'"] from [\\\'"]([A-Za-z_][A-Za-z_0-9.]*)',cleaned)
+          print(json.dumps({'public_pip_import_categories':[{'name':name if name in identifiers else 'unclassified','module':module if module.startswith('pip.') and all(part in identifiers for part in module.split('.')[1:]) else 'pip' if module=='pip' else 'unclassified'} for name,module in matches][-3:]}))
           PY
           rm -f "$RUNNER_TEMP/compiler.log"
