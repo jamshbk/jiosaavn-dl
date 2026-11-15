@@ -1,0 +1,196 @@
+'use strict';
+const $ = id => document.getElementById(id);
+const token = document.querySelector('meta[name="app-token"]').content;
+let prefs = {}, current = null, query = '', page = 1, busy = false, downloading = false;
+let selected = new Set(), returning = 'home', playing = null, playSequence = 0;
+let showJob = false, jobPolling = false, settingsQueue = Promise.resolve(), toastTimer;
+const icons = {
+  play:'<svg viewBox="0 0 24 24"><path d="m9 5 11 7-11 7z"/></svg>',
+  download:'<svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"/></svg>'
+};
+async function api(path, body) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 65000);
+  try {
+    const response = await fetch('/api/' + path, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: {'X-App-Token':token, 'Content-Type':'application/json'},
+      body: body === undefined ? undefined : JSON.stringify(body), signal:controller.signal
+    });
+    const data = await response.json();
+    if (!response.ok || data.error) throw new Error(data.error || 'Please try again.');
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Request timed out. Please try again.');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+function toast(text) {
+  clearTimeout(toastTimer); $('toast').textContent = text; $('toast').hidden = false;
+  toastTimer = setTimeout(() => $('toast').hidden = true, 5500);
+}
+function navigate(name) { if (location.hash === '#' + name) renderScreen(); else location.hash = name; }
+function renderScreen() {
+  const name = location.hash.slice(1);
+  const active = name === 'settings' ? 'settings' : name === 'details' && current ? 'details' : 'home';
+  for (const id of ['home','details','settings']) $(id).hidden = id !== active;
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', renderScreen);
+document.querySelectorAll('[data-open-settings]').forEach(button => button.addEventListener('click', () => {
+  returning = !$('details').hidden ? 'details' : 'home'; navigate('settings');
+}));
+$('settings-back').onclick = () => navigate(returning);
+$('details-back').onclick = () => navigate('home');
+function message(text) { $('home-status').textContent = text; $('detail-status').textContent = text; }
+function setBusy(value) { busy = value; $('archive').disabled = value; $('archive').textContent = value ? 'Loading…' : 'Archive'; $('query').disabled = value; $('paste').disabled = value; }
+function duration(seconds) { const n = Math.max(0,Number(seconds)||0); return Math.floor(n/60) + ':' + String(Math.floor(n%60)).padStart(2,'0'); }
+function node(tag, className, text) { const n = document.createElement(tag); if(className) n.className = className; if(text !== undefined) n.textContent = text; return n; }
+function art(url, title) {
+  const img = node('img','art'); img.alt = title ? 'Cover: ' + title : 'Cover art'; img.loading = 'lazy';
+  const fallback = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#242932"/><text x="50" y="65" text-anchor="middle" fill="#4ebbc1" font-size="50">♪</text></svg>');
+  img.src = typeof url === 'string' && url.startsWith('https://') ? url : fallback;
+  img.onerror = () => { img.onerror = null; img.src = fallback; }; return img;
+}
+function qualityNote() { $('quality-note').textContent = 'M4A / AAC · ' + (prefs.quality || '320') + ' kbps requested · Preview before downloading'; }
+async function archive(nextPage=1) {
+  if (busy) return;
+  const value = $('query').value.trim();
+  if (!value) { message('Enter a song name, artist or link.'); $('query').focus(); return; }
+  setBusy(true); message('Finding song details…');
+  try {
+    const info = await api('archive', {query:value,page:nextPage});
+    current = info; query = value; page = nextPage;
+    selected = new Set(info.kind === 'search' ? [] : info.songs.map(s => s.key));
+    renderCollection(); navigate('details'); message(info.songs.length ? '' : 'No songs found. Try a different name.');
+  } catch(error) { message(error.message); toast(error.message); }
+  finally { setBusy(false); }
+}
+$('archive-form').onsubmit = event => { event.preventDefault(); archive(); };
+$('paste').onclick = async () => {
+  try {
+    let text = '';
+    try { if(navigator.clipboard) text = await navigator.clipboard.readText(); } catch (_) {}
+    if(!text) text = (await api('clipboard',{})).text;
+    if(!text) throw new Error('Clipboard is empty.');
+    $('query').value = text.trim(); $('query').focus(); message('Link pasted. Tap Archive to see details.');
+  } catch(error) { toast(error.message); }
+};
+function renderCollection() {
+  const search = current.kind === 'search', single = current.kind === 'song';
+  $('details-heading').textContent = search ? 'Search results' : single ? 'Song details' : current.kind === 'album' ? 'Album details' : 'Playlist details';
+  const container = $('collection'); container.replaceChildren();
+  if (!search) container.append(art(current.image, current.title));
+  const info = node('div','collection-info');
+  info.append(node('span','eyebrow',search ? 'Find your next favourite' : current.kind));
+  info.append(node('h2','',current.title));
+  if(current.artist) info.append(node('p','',current.artist));
+  const total = current.songs.reduce((sum,s) => sum + s.duration,0);
+  info.append(node('p','',[current.year, current.songs.length + (current.songs.length === 1 ? ' song' : ' songs'), !search && total ? duration(total) : ''].filter(Boolean).join(' · ')));
+  container.append(info);
+  $('selection-tools').hidden = search || single;
+  $('download-selected').hidden = search;
+  $('tracks').replaceChildren();
+  for(const song of current.songs) {
+    const row = node('article','track'); row.dataset.key = song.key;
+    if(!search && !single) {
+      const check = node('input','track-check'); check.type='checkbox'; check.checked=selected.has(song.key);
+      check.setAttribute('aria-label','Select ' + song.title);
+      check.onchange=()=>{if(check.checked)selected.add(song.key);else selected.delete(song.key);selectionState();}; row.append(check);
+    }
+    row.append(art(song.image,song.title));
+    const text=node('div','track-info'); text.append(node('h3','',song.title));
+    text.append(node('p','',song.artist || 'Artist unavailable'));
+    text.append(node('p','',[duration(song.duration),song.language,song.year].filter(Boolean).join(' · ')));
+    if(search && song.album) text.append(node('p','',song.album));
+    row.append(text);
+    const actions=node('div','track-actions');
+    const play=node('button','icon-button'); play.innerHTML=icons.play; play.setAttribute('aria-label','Play ' + song.title); play.onclick=()=>playSong(song);
+    const download=node('button','icon-button'); download.innerHTML=icons.download; download.setAttribute('aria-label','Download ' + song.title); download.dataset.download='true'; download.disabled=downloading; download.onclick=()=>startDownload([song.key],false);
+    actions.append(play,download);row.append(actions);$('tracks').append(row);
+  }
+  $('pagination').hidden=!search;
+  $('previous').disabled=page<=1; $('next').disabled=current.songs.length<20;
+  $('page-number').textContent='Page ' + page;
+  qualityNote(); selectionState();
+}
+function selectionState() {
+  $('selected-count').textContent=selected.size+' selected';
+  $('download-selected').textContent=current && current.kind==='song' ? 'Download song' : 'Download selected ('+selected.size+')';
+  $('download-selected').disabled=downloading || !selected.size;
+}
+$('select-all').onclick=()=>{selected=new Set(current.songs.map(s=>s.key));renderCollection();};
+$('select-none').onclick=()=>{selected.clear();renderCollection();};
+$('download-selected').onclick=()=>startDownload([...selected],true);
+$('previous').onclick=()=>{if(!busy){$('query').value=query;archive(page-1);}};
+$('next').onclick=()=>{if(!busy){$('query').value=query;archive(page+1);}};
+async function startDownload(keys,bundle) {
+  if(downloading) return toast('A download is already running.');
+  if(!keys.length) return toast('Select at least one song.');
+  downloading=true; disableDownloads();
+  try {showJob=true;renderJob(await api('download',{keys,bundle}));$('job').scrollIntoView({block:'nearest',behavior:'smooth'});}
+  catch(error){downloading=false;disableDownloads();toast(error.message);}
+}
+function disableDownloads(){document.querySelectorAll('[data-download]').forEach(b=>b.disabled=downloading);selectionState();}
+function renderJob(job){
+  if(job.active)showJob=true;
+  downloading=!!job.active;disableDownloads();
+  $('job').hidden=!showJob;
+  $('job-message').textContent=job.message || 'Ready.';
+  $('progress').value=job.progress || 0;
+  $('cancel').hidden=!job.active;$('dismiss-job').hidden=!!job.active;
+  $('job-detail').textContent=[job.active ? job.detail : '', job.destination].filter(Boolean).join(' · ');
+  const errors=[...(job.errors || []),...(job.warnings || [])];
+  $('job-errors').hidden=!errors.length;
+  $('error-list').replaceChildren(...errors.map(text=>node('p','error-line',text)));
+}
+$('cancel').onclick=async()=>{try{await api('cancel',{});$('job-message').textContent='Cancelling…';}catch(e){toast(e.message);}};
+$('dismiss-job').onclick=()=>{showJob=false;$('job').hidden=true;};
+async function poll(){if(jobPolling)return;jobPolling=true;try{renderJob(await api('job'));}catch(_){}finally{jobPolling=false;}}
+function populateSettings(){
+  document.querySelectorAll('[data-setting]').forEach(control=>{const v=prefs[control.dataset.setting];if(control.type==='checkbox')control.checked=!!v;else control.value=v || '';});
+  $('player-quality').value=prefs.quality || '320';qualityNote();
+}
+function saveSetting(key,value){
+  $('settings-status').textContent='Saving…';
+  settingsQueue=settingsQueue.catch(()=>{}).then(async()=>{
+    try {
+      prefs=await api('settings',{patch:{[key]:value}});
+      $('settings-status').textContent='Changes save automatically.';
+      if(key==='quality'){
+        document.querySelector('[data-setting="quality"]').value=prefs.quality;
+        $('player-quality').value=prefs.quality;qualityNote();
+        if(playing)await playSong(playing,true);
+      }
+    }catch(error){$('settings-status').textContent=error.message;populateSettings();toast(error.message);}
+  });return settingsQueue;
+}
+document.querySelectorAll('[data-setting]').forEach(control=>control.onchange=()=>saveSetting(control.dataset.setting,control.type==='checkbox'?control.checked:control.value));
+$('reset').onclick=()=>{
+  settingsQueue=settingsQueue.catch(()=>{}).then(async()=>{
+    try{const was=prefs.quality;prefs=await api('settings',{reset:true});populateSettings();$('settings-status').textContent='Default settings restored.';toast('Defaults restored.');if(playing&&was!==prefs.quality)await playSong(playing,true);}
+    catch(error){toast(error.message);}
+  });
+};
+async function playSong(song,resume=false){
+  const sequence=++playSequence, audio=$('audio');
+  const position=resume&&!audio.ended?audio.currentTime:0;
+  const paused=resume&&audio.paused;
+  playing=song;$('player').hidden=false;$('player-title').textContent=song.title;$('player-artist').textContent=song.artist;
+  if(!resume)$('player').scrollIntoView({block:'nearest',behavior:'smooth'});
+  $('player-status').textContent='Loading '+prefs.quality+' kbps audio…';
+  audio.pause();
+  try{
+    const data=await api('play',{key:song.key,quality:prefs.quality});
+    if(sequence!==playSequence)return;
+    audio.onloadedmetadata=()=>{if(sequence!==playSequence)return;if(position&&Number.isFinite(audio.duration))audio.currentTime=Math.min(position,Math.max(0,audio.duration-1));};
+    audio.src=data.url;audio.load();
+    $('player-status').textContent=data.quality+' kbps requested · Availability depends on the track.';
+    if(!paused){try{await audio.play();}catch(_){$('player-status').textContent='Tap the player’s play button to start audio.';}}
+  }catch(error){if(sequence===playSequence){$('player-status').textContent=error.message;toast(error.message);}}
+}
+$('audio').onerror=()=>{if(playing)$('player-status').textContent='Audio could not load. Try another quality or song.';};
+$('player-quality').onchange=event=>saveSetting('quality',event.target.value);
+$('close-player').onclick=()=>{++playSequence;playing=null;$('audio').pause();$('audio').removeAttribute('src');$('audio').load();$('player').hidden=true;};
+async function init(){renderScreen();try{prefs=await api('settings');populateSettings();await poll();}catch(error){message(error.message);}setInterval(poll,1000);}
+init();

@@ -2,7 +2,7 @@
 from pathlib import Path
 
 
-def publish(path, android=False):
+def publish(path, android=False, folder='SaavnPocket', subfolder=''):
     if not android:
         return str(path)
     from jnius import autoclass
@@ -15,8 +15,10 @@ def publish(path, android=False):
     resolver = Activity.mActivity.getContentResolver()
     values = Values()
     values.put('_display_name', Path(path).name)
-    values.put('mime_type', 'audio/mp4')
-    values.put('relative_path', 'Download/SaavnPocket/')
+    suffix = Path(path).suffix.lower()
+    values.put('mime_type', {'.m4a': 'audio/mp4', '.zip': 'application/zip', '.txt': 'text/plain'}.get(suffix, 'application/octet-stream'))
+    relative = 'Download/' + folder.strip('/') + '/' + (subfolder.strip('/') + '/' if subfolder else '')
+    values.put('relative_path', relative)
     values.put('is_pending', Integer(1))
     uri = resolver.insert(Downloads.EXTERNAL_CONTENT_URI, values)
     if uri is None:
@@ -51,4 +53,5 @@ def publish(path, android=False):
         if output is not None:
             output.close()
     Path(path).unlink()
-    return 'Downloads/SaavnPocket/' + Path(path).name
+    return relative + Path(path).name
+

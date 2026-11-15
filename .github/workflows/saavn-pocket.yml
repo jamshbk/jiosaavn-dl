@@ -5,7 +5,7 @@ on:
     paths: ['android/**', '.github/workflows/saavn-pocket.yml']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -22,16 +22,61 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Keep debug signing identity for subsequent builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: saavn-pocket-webview-debug-signing-v1
       - name: Install build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
-          python -m pip install 'buildozer==1.5.0' 'Cython==0.29.36' setuptools
+          python -m pip install 'buildozer==1.5.0' 'Cython==0.29.36' setuptools requests mutagen playwright
+      - name: Check backend
+        run: python -m unittest discover -s tests -v
+      - name: Check responsive screens and app flow
+        run: |
+          python -m playwright install --with-deps chromium
+          python tests/ui_check.py
+      - name: Save screen previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saavn-pocket-v0.2.0-ui-previews
+          path: android/ui-previews/*.png
+          if-no-files-found: ignore
       - name: Build debug APK
         run: buildozer -v android debug
+      - name: Verify and name APK
+        run: |
+          python - <<'PY'
+          import zipfile, shutil
+          from pathlib import Path
+          files = list(Path('bin').glob('*.apk'))
+          assert len(files) == 1, 'Expected one APK'
+          with zipfile.ZipFile(files[0]) as z:
+              assert z.testzip() is None
+              assert 'AndroidManifest.xml' in z.namelist()
+              assert 'classes.dex' in z.namelist()
+          shutil.copyfile(files[0], 'Saavn-Pocket-v0.2.0-debug.apk')
+          PY
+          sha256sum Saavn-Pocket-v0.2.0-debug.apk > SHA256SUMS.txt
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: saavn-pocket-debug-apk
-          path: android/bin/*.apk
+          name: saavn-pocket-v0.2.0-apk
+          path: |
+            android/Saavn-Pocket-v0.2.0-debug.apk
+            android/SHA256SUMS.txt
           if-no-files-found: error
+      - name: Publish direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          if gh release view saavn-pocket-v0.2.0 >/dev/null 2>&1; then
+            gh release upload saavn-pocket-v0.2.0 Saavn-Pocket-v0.2.0-debug.apk SHA256SUMS.txt --clobber
+          else
+            gh release create saavn-pocket-v0.2.0 Saavn-Pocket-v0.2.0-debug.apk SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'Saavn Pocket v0.2.0 (debug)' --notes 'Responsive dark UI, editable saved settings, song and album preview before downloading, selectable tracks, audio player and quality controls. Android 10+ ARM64. This build uses a new debug signing identity: uninstall v0.1.0 before installing if Android reports a signature conflict. Physical-device playback and storage testing is still required.'
+          fi

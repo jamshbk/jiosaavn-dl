@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse, unquote
 import requests
 from mutagen.mp4 import MP4, MP4Cover
+from settings import DEFAULTS
 
 API = 'https://www.jiosaavn.com/api.php'
 
@@ -44,6 +45,10 @@ class Client:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'Mozilla/5.0'})
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        self.session.mount('https://', HTTPAdapter(max_retries=Retry(
+            total=2, backoff_factor=.4, status_forcelist=(429, 502, 503, 504))))
 
     def api(self, call, **params):
         response = self.session.get(API, params={
@@ -84,21 +89,47 @@ class Client:
                 raise ValueError('The service returned only part of this playlist. Download smaller playlists or individual tracks.')
         if not songs:
             raise ValueError('No available tracks found for this link.')
-        return songs
+        title = songs[0].get('song') if kind == 'song' else data.get('title') or data.get('listname') or songs[0].get('album')
+        return {
+            'kind': kind, 'title': clean(title),
+            'artist': clean(data.get('primary_artists') or songs[0].get('primary_artists')),
+            'year': clean(data.get('year') or songs[0].get('year')),
+            'image': data.get('image') or songs[0].get('image') or '',
+            'songs': songs,
+        }
 
-    def download(self, song, directory, cancel, progress):
-        if cancel.is_set():
-            raise Cancelled()
+    def media_url(self, song, quality='320'):
+        if quality not in ('96', '160', '320'):
+            raise ValueError('Unsupported audio quality.')
         if not song.get('encrypted_media_url'):
             raise ValueError('This track is unavailable for download.')
         auth = self.api('song.generateAuthToken', url=song['encrypted_media_url'],
-                        bitrate='320', api_version=4, ctx='web6dot0')
+                        bitrate=quality, api_version=4, ctx='web6dot0')
         media_url = auth.get('auth_url')
         if not media_url:
             raise ValueError('The service did not provide a download URL.')
         # Same CDN selection used by the upstream downloader.
         media_url = media_url.replace('web', 'aac', 1)
-        target = Path(directory) / (safe_name(song.get('song')) + ' - ' + safe_name(song.get('id')) + '.m4a')
+        parsed = urlparse(media_url)
+        host = parsed.hostname or ''
+        if parsed.scheme != 'https' or not (host.endswith('.saavncdn.com') or host.endswith('.jiosaavn.com')):
+            raise ValueError('The service returned an unsupported audio URL.')
+        return media_url
+
+    def download(self, song, directory, cancel, progress, settings=None, number=1):
+        settings = {**DEFAULTS, **(settings or {})}
+        if cancel.is_set():
+            raise Cancelled()
+        media_url = self.media_url(song, settings['quality'])
+        title = safe_name(song.get('song'))
+        artist = safe_name(song.get('primary_artists'))
+        style = settings['naming']
+        name = title if style == 'title' else (f'{number:02d}. {title}' if style == 'track_title' else f'{title} - {artist}')
+        target = Path(directory) / (name + '.m4a')
+        suffix = 2
+        while target.exists():
+            target = Path(directory) / (name + f' ({suffix}).m4a')
+            suffix += 1
         part = target.with_suffix('.part')
         try:
             with self.session.get(media_url, stream=True, timeout=(10, 30)) as response:
@@ -119,12 +150,15 @@ class Client:
             audio = MP4(part)
             for key, value in {'\xa9nam': song.get('song'), '\xa9alb': song.get('album'),
                                '\xa9ART': song.get('primary_artists'), '\xa9wrt': song.get('music'),
-                               '\xa9day': song.get('release_date') or song.get('year'),
+                               '\xa9day': (song.get('release_date') if settings['original_date'] else None) or song.get('year'),
                                'cprt': song.get('copyright_text')}.items():
                 if value:
                     audio[key] = [clean(value)]
             warnings = []
-            if song.get('image'):
+            if settings['explicit_tag']:
+                audio['rtng'] = [4 if str(song.get('explicit_content')).lower() in ('1', 'true') else 2]
+            audio['trkn'] = [(number, 0)]
+            if settings['cover_art'] and song.get('image'):
                 try:
                     image_url = song['image'].replace('150x150', '500x500')
                     with self.session.get(image_url, timeout=(10, 20)) as cover:
@@ -133,17 +167,23 @@ class Client:
                             audio['covr'] = [MP4Cover(cover.content, imageformat=MP4Cover.FORMAT_JPEG)]
                 except requests.RequestException:
                     warnings.append('cover unavailable')
-            if str(song.get('has_lyrics')).lower() == 'true':
+            lyrics_text = None
+            if (settings['embed_lyrics'] or settings['save_lyrics']) and str(song.get('has_lyrics')).lower() == 'true':
                 try:
                     lyrics = self.api('lyrics.getLyrics', lyrics_id=song['id'], api_version=4, ctx='web6dot0')
                     if lyrics.get('lyrics'):
-                        audio['\xa9lyr'] = [clean(re.sub(r'<br\s*/?>', '\n', lyrics['lyrics']))]
+                        lyrics_text = clean(re.sub(r'<br\s*/?>', '\n', lyrics['lyrics']))
+                        if settings['embed_lyrics']:
+                            audio['\xa9lyr'] = [lyrics_text]
                 except (requests.RequestException, ValueError):
                     warnings.append('lyrics unavailable')
             audio.save()
             if cancel.is_set():
                 raise Cancelled()
             part.replace(target)
+            if settings['save_lyrics'] and lyrics_text:
+                target.with_suffix('.txt').write_text(lyrics_text, encoding='utf-8')
             return target, warnings
         finally:
             part.unlink(missing_ok=True)
+
