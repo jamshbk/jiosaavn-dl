@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Outline;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -27,6 +28,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.ViewOutlineProvider;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -41,7 +43,7 @@ public final class StartupSplash {
     private static AnimatedVectorDrawable wave;
     private static ObjectAnimator breathing;
     private static volatile boolean active;
-    private static volatile int starts, frames, longFrames, layoutChanges;
+    private static volatile int starts, frames, longFrames, layoutChanges, coreLayoutChanges;
     private static volatile long started, readyAt=-1, finishedAt=-1, maxFrameGap;
     private static long previousFrame;
     private static int dp(Activity a,float value) { return Math.round(value*a.getResources().getDisplayMetrics().density); }
@@ -49,6 +51,46 @@ public final class StartupSplash {
         TextView label=new TextView(a);label.setText(value);label.setTextColor(color);
         label.setTextSize(TypedValue.COMPLEX_UNIT_DIP,size);label.setIncludeFontPadding(false);
         return label;
+    }
+
+    private static final class SplashContent extends FrameLayout {
+        final Activity owner;
+        LinearLayout core,labels;
+        ImageView logo;
+        TextView title,tagline;
+        boolean introScheduled;
+        int anchorX,anchorY,anchorWidth,anchorHeight;
+        SplashContent(Activity activity) {super(activity);owner=activity;}
+        @Override protected void onMeasure(int widthSpec,int heightSpec) {
+            if(core!=null) {
+                int width=MeasureSpec.getSize(widthSpec),height=MeasureSpec.getSize(heightSpec);
+                boolean landscape=width>height && height<dp(owner,480);
+                int size=landscape?dp(owner,130):Math.max(dp(owner,140),Math.min(dp(owner,230),Math.round(width*.43f)));
+                core.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+                LinearLayout.LayoutParams imageParams=(LinearLayout.LayoutParams)logo.getLayoutParams();
+                if(imageParams.width!=size){imageParams.width=size;imageParams.height=size;logo.setLayoutParams(imageParams);}
+                LinearLayout.LayoutParams labelParams=(LinearLayout.LayoutParams)labels.getLayoutParams();
+                int left=landscape?dp(owner,24):0,top=landscape?0:dp(owner,20);
+                if(labelParams.leftMargin!=left || labelParams.topMargin!=top){labelParams.leftMargin=left;labelParams.topMargin=top;labels.setLayoutParams(labelParams);}
+                labels.setGravity(landscape?Gravity.LEFT:Gravity.CENTER_HORIZONTAL);
+                title.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?32:38);
+                tagline.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?10:12);
+            }
+            super.onMeasure(widthSpec,heightSpec);
+        }
+        @Override protected void onLayout(boolean changed,int l,int t,int r,int b) {
+            super.onLayout(changed,l,t,r,b);
+            if(core==null)return;
+            if(introScheduled && (Math.abs(core.getLeft()-anchorX)>2 || Math.abs(core.getTop()-anchorY)>2 || core.getWidth()!=anchorWidth || core.getHeight()!=anchorHeight))coreLayoutChanges++;
+            anchorX=core.getLeft();anchorY=core.getTop();anchorWidth=core.getWidth();anchorHeight=core.getHeight();
+            if(!introScheduled) {
+                introScheduled=true;
+                core.postOnAnimation(() -> {
+                    core.animate().alpha(1).setDuration(600).start();wave.start();
+                    breathing=ObjectAnimator.ofFloat(logo,"alpha",.92f,1f,.92f);breathing.setDuration(2300);breathing.setRepeatCount(ValueAnimator.INFINITE);breathing.start();
+                });
+            }
+        }
     }
 
     public static void show(Activity activity) {
@@ -69,10 +111,11 @@ public final class StartupSplash {
         new Canvas(glow).drawRect(0,0,256,512,paint);
         BitmapDrawable background=new BitmapDrawable(activity.getResources(),glow);background.setGravity(Gravity.FILL);
         overlay.setBackground(background);
-        FrameLayout safe=new FrameLayout(activity);overlay.addView(safe,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout core=new LinearLayout(activity);core.setGravity(Gravity.CENTER);core.setAlpha(0);
+        SplashContent safe=new SplashContent(activity);overlay.addView(safe,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout core=new LinearLayout(activity);core.setGravity(Gravity.CENTER);core.setOrientation(LinearLayout.VERTICAL);core.setAlpha(0);
         safe.addView(core,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         ImageView logo=new ImageView(activity);logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setClipToOutline(true);logo.setOutlineProvider(new ViewOutlineProvider(){@Override public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),Math.min(view.getWidth(),view.getHeight())*.26f);}});
         try(InputStream input=activity.getAssets().open("startup-logo.png")) { logo.setImageBitmap(BitmapFactory.decodeStream(input)); }
         catch(Exception error) { logo.setImageResource(activity.getApplicationInfo().icon); }
         core.addView(logo,new LinearLayout.LayoutParams(dp(activity,180),dp(activity,180)));
@@ -89,19 +132,7 @@ public final class StartupSplash {
         LinearLayout.LayoutParams waveParams=new LinearLayout.LayoutParams(dp(activity,40),dp(activity,28));waveParams.topMargin=dp(activity,26);labels.addView(bars,waveParams);
         TextView version=text(activity,"Version 1.0",Color.rgb(100,117,131),11);version.setLetterSpacing(.09f);
         FrameLayout.LayoutParams versionParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);versionParams.bottomMargin=dp(activity,25);safe.addView(version,versionParams);
-        safe.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob) -> {
-            boolean landscape=r-l>b-t && b-t<dp(activity,480);
-            int size=landscape?dp(activity,130):Math.max(dp(activity,140),Math.min(dp(activity,230),Math.round((r-l)*.43f)));
-            core.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams imageParams=(LinearLayout.LayoutParams)logo.getLayoutParams();
-            if (imageParams.width!=size) { imageParams.width=size;imageParams.height=size;logo.setLayoutParams(imageParams); }
-            LinearLayout.LayoutParams labelParams=(LinearLayout.LayoutParams)labels.getLayoutParams();
-            int left=landscape?dp(activity,24):0,top=landscape?0:dp(activity,20);
-            if(labelParams.leftMargin!=left || labelParams.topMargin!=top) {labelParams.leftMargin=left;labelParams.topMargin=top;labels.setLayoutParams(labelParams);}
-            labels.setGravity(landscape?Gravity.LEFT:Gravity.CENTER_HORIZONTAL);
-            title.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?32:38);
-            tagline.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?10:12);
-        });
+        safe.core=core;safe.labels=labels;safe.logo=logo;safe.title=title;safe.tagline=tagline;
         overlay.setOnApplyWindowInsetsListener((view,insets) -> {
             int left,top,right,bottom;
             if(Build.VERSION.SDK_INT>=30) {Insets margins=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());left=margins.left;top=margins.top;right=margins.right;bottom=margins.bottom;}
@@ -112,10 +143,6 @@ public final class StartupSplash {
         });
         ((ViewGroup)decor).addView(overlay,new FrameLayout.LayoutParams(-1,-1));overlay.requestApplyInsets();
         overlay.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob) -> {if(or>ol && ob>ot && (l!=ol || t!=ot || r!=or || b!=ob))layoutChanges++;});
-        core.postOnAnimation(() -> core.postOnAnimation(() -> {
-            core.animate().alpha(1).setDuration(600).start();wave.start();
-            breathing=ObjectAnimator.ofFloat(logo,"alpha",.92f,1f,.92f);breathing.setDuration(2300);breathing.setRepeatCount(ValueAnimator.INFINITE);breathing.start();
-        }));
         Choreographer.getInstance().postFrameCallback(new Choreographer.FrameCallback() {
             @Override public void doFrame(long now) {
                 if(!active)return;
@@ -141,7 +168,7 @@ public final class StartupSplash {
     }
 
     public static String stats() {
-        try {JSONObject data=new JSONObject();data.put("starts",starts);data.put("active",active);data.put("readyMs",readyAt);data.put("finishedMs",finishedAt);data.put("frames",frames);data.put("maxFrameGapMs",maxFrameGap);data.put("longFrames",longFrames);data.put("layoutChanges",layoutChanges);data.put("animationEngine","native-vector");return data.toString();}
+        try {JSONObject data=new JSONObject();data.put("starts",starts);data.put("active",active);data.put("readyMs",readyAt);data.put("finishedMs",finishedAt);data.put("frames",frames);data.put("maxFrameGapMs",maxFrameGap);data.put("longFrames",longFrames);data.put("layoutChanges",layoutChanges);data.put("coreLayoutChanges",coreLayoutChanges);data.put("animationEngine","native-vector");return data.toString();}
         catch(Exception ignored){return "{}";}
     }
 }

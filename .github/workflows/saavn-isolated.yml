@@ -96,15 +96,15 @@ jobs:
               assert 'splash-core' not in loader, 'Bootstrap must not play a second splash'
               assert 'res/drawable/startup_wave_animated.xml' in z.namelist()
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-continuous-splash.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-splash-final.apk')
           PY
-          sha256sum SaavnDl-v1.0-continuous-splash.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-splash-final.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-continuous-splash.apk
+            android/SaavnDl-v1.0-splash-final.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -171,4 +171,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0-continuous-splash apk/SaavnDl-v1.0-continuous-splash.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — continuous splash' --notes 'One persistent native splash with a RenderThread vector waveform and cached glow. No extra splash WebView, oversized logo, repeated intro, circle or white launch window. Home-ready fade. Cold and warm Android 10/15 startup videos run with animations enabled. Version 1.0, code 1005. Android 10+, ARM64.'
+          gh release create saavndl-v1.0-splash-final apk/SaavnDl-v1.0-splash-final.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — continuous splash' --notes 'Single native splash with a compositor vector waveform, dark launch theme and logo geometry measured before its first visible frame. No repeated splash or circle. Home-ready fade. Cold startup plus ordinary repeat-launch videos and Android 10/15 storage tests run before publishing. Version 1.0, code 1006. Android 10+, ARM64.'

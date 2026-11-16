@@ -12,7 +12,7 @@ def adb(*args, check=True):
     return subprocess.run(['adb',*args],check=check,text=True,capture_output=True).stdout
 
 
-apk=Path('android/SaavnDl-v1.0-continuous-splash.apk')
+apk=Path('android/SaavnDl-v1.0-splash-final.apk')
 adb('install','-r',str(apk))
 # Keep software-GPU capture representative and avoid 1080p encoder overload.
 adb('shell','wm','size','540x960')
@@ -24,7 +24,7 @@ previews=Path('android/native-previews');previews.mkdir(exist_ok=True)
 # Record the actual cold startup with Android's animator scale enabled.
 for name in ('window_animation_scale','transition_animation_scale','animator_duration_scale'):
     adb('shell','settings','put','global',name,'1.0')
-recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000','--time-limit','60','/sdcard/saavndl-startup.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000','--time-limit','180','/sdcard/saavndl-startup.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 time.sleep(.5)
 adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity',
     '--ez','saavn_native_test','true')
@@ -75,7 +75,7 @@ for attempt in range(60):
     time.sleep(.5)
 else:raise AssertionError('Continuous splash did not hand off to the home page: '+json.dumps(startup))
 assert startup['readyMs']>=0 and startup['finishedMs']>=1450,startup
-assert startup['layoutChanges']==0,startup
+assert startup['layoutChanges']==0 and startup['coreLayoutChanges']==0,startup
 assert startup['frames']>10,startup
 (previews/'startup-timing.json').write_text(json.dumps(startup),encoding='utf-8')
 time.sleep(1)
@@ -84,31 +84,6 @@ try:recording.wait(timeout=15)
 except subprocess.TimeoutExpired:recording.kill();recording.wait()
 adb('pull','/sdcard/saavndl-startup.mp4',str(previews/'startup.mp4'))
 assert (previews/'startup.mp4').stat().st_size>10000
-
-# Repeat an ordinary launch after unpacking: this is the everyday user startup.
-adb('shell','am','force-stop','org.example.saavnpocket')
-recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000','--time-limit','60','/sdcard/saavndl-startup-warm.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-time.sleep(.5)
-adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity','--ez','saavn_native_test','true')
-for attempt in range(60):
-    try:
-        response=requests.get('http://127.0.0.1:5051/',timeout=2)
-        headers['X-App-Token']=re.search(r'name="app-token" content="([^"]+)"',response.text).group(1)
-        warm=api('startup')
-        if warm.get('starts')==1 and not warm.get('active'):break
-    except (requests.RequestException,AttributeError):pass
-    time.sleep(.5)
-else:raise AssertionError('Warm startup did not complete.')
-assert warm['layoutChanges']==0 and warm['animationEngine']=='native-vector',warm
-assert warm['readyMs']>=0 and warm['finishedMs']>=1450,warm
-(previews/'startup-warm-timing.json').write_text(json.dumps(warm),encoding='utf-8')
-time.sleep(1)
-adb('shell','pkill','-2','screenrecord',check=False)
-try:recording.wait(timeout=15)
-except subprocess.TimeoutExpired:recording.kill();recording.wait()
-adb('pull','/sdcard/saavndl-startup-warm.mp4',str(previews/'startup-warm.mp4'))
-assert (previews/'startup-warm.mp4').stat().st_size>10000
-print('PASS: cold and warm native splash, stable layout, home-ready handoff and animation-enabled videos.')
 
 def check_insets(label,landscape=False):
     deadline=time.monotonic()+30
@@ -208,5 +183,38 @@ for attempt in range(45):
 assert api('native-check-folder',{})['ok']
 api('folder/default',{})
 assert not api('destination')['uri']
+# Repeat an ordinary launch after unpacking: this is the everyday user startup.
+adb('shell','am','force-stop','org.example.saavnpocket')
+recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000','--time-limit','180','/sdcard/saavndl-startup-warm.mp4'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+time.sleep(.5)
+adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity')
+for attempt in range(60):
+    try:
+        response=requests.get('http://127.0.0.1:5051/',timeout=2)
+        headers['X-App-Token']=re.search(r'name="app-token" content="([^"]+)"',response.text).group(1)
+        warm=api('startup')
+        if warm.get('starts')==1 and not warm.get('active'):break
+    except (requests.RequestException,AttributeError):pass
+    time.sleep(.5)
+else:raise AssertionError('Warm startup did not complete.')
+assert warm['layoutChanges']==0 and warm['coreLayoutChanges']==0 and warm['animationEngine']=='native-vector',warm
+assert warm['readyMs']>=0 and warm['finishedMs']>=1450,warm
+(previews/'startup-warm-timing.json').write_text(json.dumps(warm),encoding='utf-8')
+# Confirm the visible home UI before stopping the video, not just a timer.
+for attempt in range(10):
+    adb('shell','uiautomator','dump','/sdcard/saavndl-home.xml',check=False)
+    hierarchy=adb('shell','cat','/sdcard/saavndl-home.xml',check=False)
+    if 'Archive' in hierarchy and 'Starting SaavnDl' not in hierarchy:break
+    time.sleep(.5)
+else:raise AssertionError('Home screen was not visibly available after splash handoff.')
+time.sleep(2)
+adb('shell','pkill','-2','screenrecord',check=False)
+try:recording.wait(timeout=15)
+except subprocess.TimeoutExpired:recording.kill();recording.wait()
+adb('pull','/sdcard/saavndl-startup-warm.mp4',str(previews/'startup-warm.mp4'))
+assert (previews/'startup-warm.mp4').stat().st_size>10000
+print('PASS: cold and warm native splash, stable layout, home-ready handoff and animation-enabled videos.')
+
+
 Path('android/native-check-result.txt').write_text('PASS: MediaStore worker export, native system-bar insets, rotation, custom folder write/readback and persisted permission after restart.',encoding='utf-8')
 print('PASS: Actual Android APK storage, system-bar insets, rotation, custom folder picker, readback and persistent grants after restart.')
