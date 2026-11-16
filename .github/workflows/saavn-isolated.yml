@@ -94,20 +94,17 @@ jobs:
               loader = z.read('assets/_load.html').decode()
               assert 'saavndl-bootstrap' in loader, 'Default WebView loader must be replaced'
               assert 'splash-core' not in loader, 'Bootstrap must not play a second splash'
-              splash = z.read('assets/_splash.html').decode()
-              assert 'startup-logo.png' in splash and 'splash-core' in splash
-              assert 'splash-orbit' not in splash
+              assert 'res/drawable/startup_wave_animated.xml' in z.namelist()
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
-              assert '.splash' in z.read('assets/startup-style.css').decode()
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-smooth-splash.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-continuous-splash.apk')
           PY
-          sha256sum SaavnDl-v1.0-smooth-splash.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-continuous-splash.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-smooth-splash.apk
+            android/SaavnDl-v1.0-continuous-splash.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -174,4 +171,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0-smooth-splash apk/SaavnDl-v1.0-smooth-splash.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — continuous splash' --notes 'One continuous startup splash persists while Python and the app WebView load, then fades out only after the home page renders. Removed duplicate startup replay and oversized presplash logo. Waveform uses compositor transforms. Includes Android 10 and 15 startup video checks with animations enabled. Version 1.0, code 1004. Android 10+, ARM64.'
+          gh release create saavndl-v1.0-continuous-splash apk/SaavnDl-v1.0-continuous-splash.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — continuous splash' --notes 'One persistent native splash with a RenderThread vector waveform and cached glow. No extra splash WebView, oversized logo, repeated intro, circle or white launch window. Home-ready fade. Cold and warm Android 10/15 startup videos run with animations enabled. Version 1.0, code 1005. Android 10+, ARM64.'
