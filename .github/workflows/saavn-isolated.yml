@@ -1,4 +1,4 @@
-name: Build SaavnDl 1.0 album search
+name: Build SaavnDl 1.0 splash update
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -96,15 +96,15 @@ jobs:
               assert 'startup-logo.png' in loader
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
               assert '.splash' in z.read('assets/startup-style.css').decode()
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-albums.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-no-circle.apk')
           PY
-          sha256sum SaavnDl-v1.0-albums.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-no-circle.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-albums.apk
+            android/SaavnDl-v1.0-no-circle.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -169,4 +169,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0-albums apk/SaavnDl-v1.0-albums.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — album search and ZIP' --notes 'SaavnDl 1.0: Tracks / Albums search selector, album results open only that album, and a dedicated Download album ZIP action that works independently of the ZIP preference, including one-track albums. Keeps native safe layout, custom folders and dark startup branding. Android 10+, ARM64. Version code 1002.'
+          gh release create saavndl-v1.0-no-circle apk/SaavnDl-v1.0-no-circle.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — splash without circle' --notes 'Removed only the outer orbit circle and moving dot from both startup splash stages. Logo, text, waveform animation, search, album ZIP, settings and download behavior remain unchanged. Version 1.0, version code 1003. Android 10+, ARM64.'
