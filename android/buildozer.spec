@@ -1,5 +1,5 @@
 [app]
-title = SaavnDl
+title = JS-DL
 package.name = saavnpocket
 package.domain = org.example
 source.dir = .
@@ -15,12 +15,12 @@ android.minapi = 29
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.debug_artifact = apk
-android.numeric_version = 1007
+android.numeric_version = 1008
 android.add_src = native
 android.add_assets = startup/_load.html:_load.html,web/logo.png:startup-logo.png
 icon.filename = %(source.dir)s/assets/icon.png
 presplash.filename = %(source.dir)s/assets/icon.png
-presplash.color = #101114
+presplash.color = #100f14
 p4a.bootstrap = webview
 p4a.hook = startup_hook.py
 [buildozer]

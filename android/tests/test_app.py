@@ -48,7 +48,37 @@ class BackendTests(unittest.TestCase):
         albums=client.search_albums('One',2)
         self.assertEqual([a['title'] for a in albums],['Album & One'])
         self.assertEqual(albums[0]['artist'],'Artist')
-        client.api.assert_called_once_with('search.getAlbumResults',q='One',p=2,n=20,api_version=4,ctx='web6dot0')
+        self.assertEqual(client.api.call_count,2)
+        self.assertEqual([call.args[0] for call in client.api.call_args_list],['search.getAlbumResults','search.getResults'])
+
+    def test_song_title_finds_its_album_when_album_title_search_is_empty(self):
+        client=backend.Client()
+        client.api=Mock(side_effect=[{'results':[]},{'results':[{
+            'title':'Gerua','year':'2015','more_info':{'album':'Dilwale',
+                'album_url':'https://www.jiosaavn.com/album/dilwale/albumToken',
+                'artistMap':{'primary_artists':[{'name':'Arijit Singh'}]}}}]}])
+        albums=client.search_albums('Gerua')
+        self.assertEqual([(a['title'],a['matched_song']) for a in albums],[('Dilwale','Gerua')])
+        self.assertEqual(albums[0]['artist'],'Arijit Singh')
+
+    def test_song_linked_albums_are_deduplicated_by_token_and_keep_pagination(self):
+        client=backend.Client()
+        song={'title':'Track','more_info':{'album':'Real Album','album_url':'https://www.jiosaavn.com/album/real/sameToken'}}
+        client.api=Mock(side_effect=[{'results':[{'title':'Real Album','perma_url':'https://jiosaavn.com/album/alias/sameToken'}]},
+                                     {'results':[song]*20}])
+        self.assertEqual(len(client.search_albums('Track')),1)
+        self.assertTrue(client.album_has_more)
+
+    def test_album_title_matches_survive_song_lookup_failure(self):
+        client=backend.Client()
+        client.api=Mock(side_effect=[{'results':[{'title':'Album','perma_url':'https://www.jiosaavn.com/album/a/token'}]},backend.requests.ConnectionError('offline')])
+        self.assertEqual(client.search_albums('Album')[0]['title'],'Album')
+        self.assertIn('Song-based',client.album_search_note)
+
+    def test_both_album_sources_failing_is_an_error(self):
+        client=backend.Client();client.api=Mock(side_effect=backend.requests.ConnectionError('offline'))
+        with self.assertRaisesRegex(ValueError,'temporarily unavailable'):
+            client.search_albums('Track')
 
     def test_preview_resolves_metadata_without_downloading(self):
         client = backend.Client()

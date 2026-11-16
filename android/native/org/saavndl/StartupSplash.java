@@ -100,17 +100,17 @@ public final class StartupSplash {
         if (overlay!=null || starts>0) return;
         starts++;active=true;started=SystemClock.uptimeMillis();
         Window window=activity.getWindow();
-        window.setBackgroundDrawable(new ColorDrawable(Color.rgb(16,17,20)));
-        window.setStatusBarColor(Color.rgb(16,17,20));window.setNavigationBarColor(Color.rgb(16,17,20));
+        window.setBackgroundDrawable(new ColorDrawable(Color.rgb(16,15,20)));
+        window.setStatusBarColor(Color.rgb(16,15,20));window.setNavigationBarColor(Color.rgb(16,15,20));
         if (Build.VERSION.SDK_INT>=29) window.setNavigationBarContrastEnforced(false);
         if (Build.VERSION.SDK_INT>=30) window.setDecorFitsSystemWindows(false);
         View decor=window.getDecorView();
         decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        overlay=new FrameLayout(activity);overlay.setClickable(true);overlay.setContentDescription("Starting SaavnDl");
+        overlay=new FrameLayout(activity);overlay.setClickable(true);overlay.setContentDescription("Starting JS-DL");
         // Pre-render the static glow once, instead of shading an entire WebView every frame.
         Bitmap glow=Bitmap.createBitmap(256,512,Bitmap.Config.ARGB_8888);
         Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setShader(new RadialGradient(128,215,320,new int[]{Color.rgb(7,42,53),Color.rgb(8,18,29),Color.rgb(13,15,22)},new float[]{0,.5f,1},Shader.TileMode.CLAMP));
+        paint.setShader(new RadialGradient(128,215,320,new int[]{Color.rgb(58,11,29),Color.rgb(27,12,22),Color.rgb(16,15,20)},new float[]{0,.5f,1},Shader.TileMode.CLAMP));
         new Canvas(glow).drawRect(0,0,256,512,paint);
         BitmapDrawable background=new BitmapDrawable(activity.getResources(),glow);background.setGravity(Gravity.FILL);
         overlay.setBackground(background);
@@ -124,16 +124,16 @@ public final class StartupSplash {
         core.addView(logo,new LinearLayout.LayoutParams(dp(activity,180),dp(activity,180)));
         LinearLayout labels=new LinearLayout(activity);labels.setOrientation(LinearLayout.VERTICAL);labels.setGravity(Gravity.CENTER_HORIZONTAL);
         core.addView(labels,new LinearLayout.LayoutParams(-2,-2));
-        TextView title=text(activity,"SaavnDl",Color.rgb(238,237,242),38);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);title.setLetterSpacing(-.045f);
-        SpannableString name=new SpannableString("SaavnDl");name.setSpan(new ForegroundColorSpan(Color.rgb(33,202,213)),5,7,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);title.setText(name);
+        TextView title=text(activity,"JS-DL",Color.rgb(238,237,242),38);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);title.setLetterSpacing(-.045f);
+        SpannableString name=new SpannableString("JS-DL");name.setSpan(new ForegroundColorSpan(Color.rgb(255,107,145)),2,5,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);title.setText(name);
         labels.addView(title,new LinearLayout.LayoutParams(-2,-2));
-        TextView tagline=text(activity,"SEARCH. PLAY. SAVE.",Color.rgb(140,174,189),12);tagline.setLetterSpacing(.25f);
+        TextView tagline=text(activity,"SEARCH. PLAY. SAVE.",Color.rgb(205,167,184),12);tagline.setLetterSpacing(.25f);
         LinearLayout.LayoutParams tagParams=new LinearLayout.LayoutParams(-2,-2);tagParams.topMargin=dp(activity,8);labels.addView(tagline,tagParams);
         ImageView bars=new ImageView(activity);
         int resource=activity.getResources().getIdentifier("startup_wave_animated","drawable",activity.getPackageName());
         wave=(AnimatedVectorDrawable)activity.getDrawable(resource);bars.setImageDrawable(wave);
         LinearLayout.LayoutParams waveParams=new LinearLayout.LayoutParams(dp(activity,40),dp(activity,28));waveParams.topMargin=dp(activity,26);labels.addView(bars,waveParams);
-        TextView version=text(activity,"Version 1.0",Color.rgb(100,117,131),11);version.setLetterSpacing(.09f);
+        TextView version=text(activity,"Version 1.0",Color.rgb(146,120,135),11);version.setLetterSpacing(.09f);
         FrameLayout.LayoutParams versionParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);versionParams.bottomMargin=dp(activity,25);safe.addView(version,versionParams);
         safe.core=core;safe.labels=labels;safe.logo=logo;safe.title=title;safe.tagline=tagline;
         overlay.setOnApplyWindowInsetsListener((view,insets) -> {

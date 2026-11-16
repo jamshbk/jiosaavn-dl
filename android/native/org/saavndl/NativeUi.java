@@ -61,8 +61,8 @@ public final class NativeUi implements PythonActivity.ActivityResultListener {
             Window window = activity.getWindow();
             if ((activity.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0)
                 WebView.setWebContentsDebuggingEnabled(true);
-            window.setStatusBarColor(Color.rgb(16,17,20));
-            window.setNavigationBarColor(Color.rgb(16,17,20));
+            window.setStatusBarColor(Color.rgb(16,15,20));
+            window.setNavigationBarColor(Color.rgb(16,15,20));
             if (Build.VERSION.SDK_INT >= 29) window.setNavigationBarContrastEnforced(false);
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             View decor = window.getDecorView();
@@ -70,7 +70,7 @@ public final class NativeUi implements PythonActivity.ActivityResultListener {
             decor.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
             View content = activity.findViewById(android.R.id.content);
-            content.setBackgroundColor(Color.rgb(16,17,20));
+            content.setBackgroundColor(Color.rgb(16,15,20));
             content.getViewTreeObserver().addOnGlobalLayoutListener(() -> recordMetrics(content,decor));
             content.setOnApplyWindowInsetsListener((view, insets) -> {
                 int left, top, right, bottom, keyboard = 0;

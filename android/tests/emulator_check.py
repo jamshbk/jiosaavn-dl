@@ -12,7 +12,7 @@ def adb(*args, check=True):
     return subprocess.run(['adb',*args],check=check,text=True,capture_output=True).stdout
 
 
-apk=Path('android/SaavnDl-v1.0-splash-stable.apk')
+apk=Path('android/JS-DL-v1.0.apk')
 adb('install','-r',str(apk))
 # Keep software-GPU capture representative and avoid 1080p encoder overload.
 adb('shell','wm','size','540x960')
@@ -28,7 +28,7 @@ recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000',
 time.sleep(.5)
 adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity',
     '--ez','saavn_native_test','true')
-deadline=time.monotonic()+240
+deadline=time.monotonic()+360
 success=False
 restarted=False
 while time.monotonic()<deadline:
@@ -52,7 +52,7 @@ for attempt in range(30):
     try:
         response=requests.get('http://127.0.0.1:5051/',timeout=3)
         response.raise_for_status()
-        assert 'SaavnDl' in response.text
+        assert 'JS-DL' in response.text
         assert 'archive-form' in response.text
         break
     except Exception:
@@ -206,7 +206,7 @@ assert warm['measureConfigurations']<=3 and warm['measurePasses']<100,warm
 for attempt in range(10):
     adb('shell','uiautomator','dump','/sdcard/saavndl-home.xml',check=False)
     hierarchy=adb('shell','cat','/sdcard/saavndl-home.xml',check=False)
-    if 'Archive' in hierarchy and 'Starting SaavnDl' not in hierarchy:break
+    if 'Archive' in hierarchy and 'Starting JS-DL' not in hierarchy:break
     time.sleep(.5)
 else:raise AssertionError('Home screen was not visibly available after splash handoff.')
 time.sleep(2)

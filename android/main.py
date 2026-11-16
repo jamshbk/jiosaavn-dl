@@ -262,8 +262,11 @@ class Handler(BaseHTTPRequestHandler):
                 if search_type not in ('tracks', 'albums'):
                     raise ValueError('Choose Tracks or Albums.')
                 if search_type == 'albums':
+                    albums = client.search_albums(query, page)
                     return self.respond({'kind': 'album-search', 'title': query,
-                                         'albums': client.search_albums(query, page), 'songs': [], 'page': page})
+                                         'albums': albums, 'songs': [], 'page': page,
+                                         'has_more': bool(getattr(client, 'album_has_more', len(albums) >= 20)),
+                                         'note': str(getattr(client, 'album_search_note', ''))})
                 songs = register(client.search(query, page))
                 return self.respond({'kind': 'search', 'title': query, 'songs': songs, 'page': page})
             if path == '/api/clipboard':

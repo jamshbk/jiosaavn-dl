@@ -3,7 +3,7 @@ from pathlib import Path
 from android_bridge import get_bridge
 
 
-def publish(path, android=False, folder='SaavnDl', subfolder=''):
+def publish(path, android=False, folder='JS-DL', subfolder=''):
     if not android:
         return str(path)
     destination=get_destination()

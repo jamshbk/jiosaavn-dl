@@ -5,7 +5,7 @@ from pathlib import Path
 from filenames import TEMPLATE_KEYS, validate_template
 
 DEFAULTS = {
-    'quality': '320', 'folder': 'SaavnDl', 'naming': 'title_artist',
+    'quality': '320', 'folder': 'JS-DL', 'naming': 'title_artist',
     'single_track_template': '{title}',
     'album_zip_template': '{albumArtist} - {album} ({year})',
     'album_track_template': '{title}',
@@ -49,7 +49,7 @@ class Settings:
         self.lock = threading.Lock()
         try:
             saved=json.loads(self.path.read_text(encoding='utf-8'))
-            if saved.get('folder')=='SaavnPocket':saved['folder']='SaavnDl'
+            if saved.get('folder') in ('SaavnPocket','SaavnDl'):saved['folder']='JS-DL'
             if 'single_track_template' not in saved and 'naming' in saved:
                 saved['single_track_template']={'title_artist':'{title} - {artist}','title':'{title}','track_title':'{track}. {title}'}.get(saved['naming'],'{title}')
             self.values = validate(saved)

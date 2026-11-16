@@ -1,4 +1,4 @@
-# SaavnDl 1.0
+# JS-DL 1.0
 
 Android 10+ ARM64 music app, with a local-only Python server and responsive WebView UI.
 
@@ -7,7 +7,7 @@ Android 10+ ARM64 music app, with a local-only Python server and responsive WebV
 - Native status/navigation/cutout insets in portrait and landscape.
 - Four validated filename templates with live previews; Unicode-safe names.
 - Persistent Android folder picker for custom phone or SD-card destinations.
-- Original SaavnDl launcher logo and animated splash; reduced-motion support.
+- Original JS-DL launcher logo and animated splash; reduced-motion support.
 - Smooth page/button/accordion transitions.
 - Song/album previews, selected downloads, quality controls and optional album ZIP.
 
@@ -22,7 +22,7 @@ When disc metadata is unavailable, tracks are treated as Disc 1. M4A/AAC is the
 supported audio format. Quality is requested from the service and depends on availability.
 
 The package ID remains org.example.saavnpocket so signed-compatible builds can
-update an existing installation. The visible app name is SaavnDl and version 1.0.
+update an existing installation. The visible app name is JS-DL and version 1.0.
 
 ## Checks
 

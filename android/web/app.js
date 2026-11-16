@@ -64,7 +64,7 @@ function duration(seconds) { const n = Math.max(0,Number(seconds)||0); return Ma
 function node(tag, className, text) { const n = document.createElement(tag); if(className) n.className = className; if(text !== undefined) n.textContent = text; return n; }
 function art(url, title) {
   const img = node('img','art'); img.alt = title ? 'Cover: ' + title : 'Cover art'; img.loading = 'lazy';
-  const fallback = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#242932"/><text x="50" y="65" text-anchor="middle" fill="#4ebbc1" font-size="50">♪</text></svg>');
+  const fallback = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#2b1a25"/><text x="50" y="65" text-anchor="middle" fill="#ff6b91" font-size="50">♪</text></svg>');
   img.src = typeof url === 'string' && url.startsWith('https://') ? url : fallback;
   img.onerror = () => { img.onerror = null; img.src = fallback; }; return img;
 }
@@ -78,7 +78,7 @@ async function archive(nextPage=1) {
     const info = await api('archive', {query:value,page:nextPage,search_type:searchType});
     current = info; query = value; page = nextPage;searchResults=null;
     selected = new Set(['search','album-search'].includes(info.kind) ? [] : info.songs.map(s => s.key));
-    renderCollection(); navigate('details'); message((info.kind==='album-search'?info.albums:info.songs).length ? '' : info.kind==='album-search'?'No albums found. Try a different name.':'No tracks found. Try a different name.');
+    renderCollection(); navigate('details'); message(info.note || ((info.kind==='album-search'?info.albums:info.songs).length ? '' : info.kind==='album-search'?'No albums found. Try a different name.':'No tracks found. Try a different name.'));
   } catch(error) { message(error.message); toast(error.message); }
   finally { setBusy(false); }
 }
@@ -129,7 +129,9 @@ function renderCollection() {
     card.setAttribute('aria-label','Open album '+album.title);card.append(art(album.image,album.title));
     const text=node('div','album-info');text.append(node('h3','',album.title));
     if(album.artist)text.append(node('p','',album.artist));
-    text.append(node('p','',album.year||'Album'));card.append(text,node('span','album-arrow','›'));
+    text.append(node('p','',album.year||'Album'));
+    if(album.matched_song)text.append(node('p','album-match','Includes: '+album.matched_song));
+    card.append(text,node('span','album-arrow','›'));
     card.onclick=()=>openAlbum(album);$('albums').append(card);
   }
   $('tracks').replaceChildren();
@@ -152,7 +154,7 @@ function renderCollection() {
     actions.append(play,download);row.append(actions);$('tracks').append(row);
   }
   $('pagination').hidden=!search;
-  $('previous').disabled=page<=1; $('next').disabled=items.length<20;
+  $('previous').disabled=page<=1; $('next').disabled=typeof current.has_more==='boolean'?!current.has_more:items.length<20;
   $('page-number').textContent='Page ' + page;
   qualityNote(); selectionState();
 }

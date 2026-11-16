@@ -76,24 +76,55 @@ class Client:
         return [s for s in songs if isinstance(s, dict) and s.get('perma_url')]
 
     def search_albums(self, query, page=1):
-        data = self.api('search.getAlbumResults', q=query, p=page, n=20, api_version=4, ctx='web6dot0')
-        results = data.get('results', [])
-        if not isinstance(results, list):
-            raise ValueError('Album search response format has changed.')
-        albums = []
-        for item in results:
-            if not isinstance(item, dict):
-                continue
-            link = item.get('perma_url') or ''
+        # Album-title search alone cannot find an album from a song title.
+        # Merge the actual album links of matching tracks, ahead of title matches.
+        responses, failures = {}, []
+        for kind, call in (('albums', 'search.getAlbumResults'), ('tracks', 'search.getResults')):
             try:
-                if parse_link(link)[0] != 'album':
-                    continue
-            except (ValueError, TypeError):
-                continue
-            albums.append({'title': clean(item.get('title') or item.get('name') or item.get('album')),
-                           'artist': clean(item.get('primary_artists') or item.get('music') or item.get('subtitle') or item.get('description')),
-                           'year': clean(item.get('year') or (item.get('more_info') or {}).get('year')), 'image': item.get('image') or '',
-                           'url': link})
+                data = self.api(call, q=query, p=page, n=20, api_version=4, ctx='web6dot0')
+                rows = data.get('results', [])
+                if not isinstance(rows, list):
+                    raise ValueError('Album search response format has changed.')
+                responses[kind] = [row for row in rows if isinstance(row, dict)]
+            except (requests.RequestException, ValueError) as error:
+                failures.append((kind, error))
+                responses[kind] = []
+        if len(failures) == 2:
+            raise ValueError('Album search is temporarily unavailable. Please retry.') from failures[-1][1]
+        self.album_has_more = any(len(rows) >= 20 for rows in responses.values())
+        self.album_search_note = ''
+        if failures:
+            self.album_search_note = ('Album-title search is temporarily unavailable. Showing albums from matching tracks.'
+                                      if failures[0][0] == 'albums' else
+                                      'Song-based album lookup is temporarily unavailable. Showing album-title matches.')
+        albums, seen = [], set()
+
+        def add(title, artist, year, image, link, matched_song=''):
+            try:
+                kind, token = parse_link(link)
+                if kind != 'album' or token in seen:
+                    return
+            except (ValueError, TypeError, AttributeError):
+                return
+            seen.add(token)
+            albums.append({'title': clean(title) or 'Album', 'artist': clean(artist),
+                           'year': clean(year), 'image': image or '', 'url': link,
+                           'matched_song': clean(matched_song)})
+
+        for song in responses['tracks']:
+            more = song.get('more_info') if isinstance(song.get('more_info'), dict) else {}
+            artist_map = more.get('artistMap') or more.get('artists') or {}
+            primary = (artist_map.get('primary_artists') or artist_map.get('primary') or []) if isinstance(artist_map, dict) else []
+            artist = song.get('primary_artists') or ', '.join(str(a.get('name') or '') for a in primary if isinstance(a, dict))
+            add(more.get('album') or song.get('album'), artist,
+                more.get('year') or song.get('year'), song.get('image'),
+                more.get('album_url') or song.get('album_url') or '',
+                song.get('title') or song.get('song'))
+        for item in responses['albums']:
+            more = item.get('more_info') if isinstance(item.get('more_info'), dict) else {}
+            add(item.get('title') or item.get('name') or item.get('album'),
+                item.get('primary_artists') or item.get('music') or item.get('subtitle') or item.get('description'),
+                item.get('year') or more.get('year'), item.get('image'), item.get('perma_url') or '')
         return albums
 
     def resolve(self, link):

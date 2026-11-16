@@ -24,7 +24,7 @@ class FixtureClient:
     def search(self, query, page=1):
         return SONGS
     def search_albums(self,query,page=1):
-        return [{'title':'Evening Sessions','artist':'Example Artist','year':'2024','image':'','url':'https://www.jiosaavn.com/album/evening/token'},
+        return [{'title':'Evening Sessions','artist':'Example Artist','year':'2024','image':'','matched_song':'A Song With a Very Long Title','url':'https://www.jiosaavn.com/album/evening/token'},
                 {'title':'Other Album','artist':'Other Artist','year':'2023','image':'','url':'https://www.jiosaavn.com/album/other/token'}]
     def resolve(self, link):
         return {'kind':'album', 'title':'Evening Sessions','artist':'Example Artist',
