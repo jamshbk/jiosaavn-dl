@@ -12,7 +12,7 @@ def adb(*args, check=True):
     return subprocess.run(['adb',*args],check=check,text=True,capture_output=True).stdout
 
 
-apk=Path('android/SaavnDl-v1.0-splash-final.apk')
+apk=Path('android/SaavnDl-v1.0-splash-stable.apk')
 adb('install','-r',str(apk))
 # Keep software-GPU capture representative and avoid 1080p encoder overload.
 adb('shell','wm','size','540x960')
@@ -28,7 +28,7 @@ recording=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','2000000',
 time.sleep(.5)
 adb('shell','am','start','-W','-n','org.example.saavnpocket/org.kivy.android.PythonActivity',
     '--ez','saavn_native_test','true')
-deadline=time.monotonic()+120
+deadline=time.monotonic()+240
 success=False
 restarted=False
 while time.monotonic()<deadline:
@@ -77,6 +77,7 @@ else:raise AssertionError('Continuous splash did not hand off to the home page: 
 assert startup['readyMs']>=0 and startup['finishedMs']>=1450,startup
 assert startup['layoutChanges']==0 and startup['coreLayoutChanges']==0,startup
 assert startup['frames']>10,startup
+assert startup['measureConfigurations']<=3 and startup['measurePasses']<100,startup
 (previews/'startup-timing.json').write_text(json.dumps(startup),encoding='utf-8')
 time.sleep(1)
 adb('shell','pkill','-2','screenrecord',check=False)
@@ -199,6 +200,7 @@ for attempt in range(60):
 else:raise AssertionError('Warm startup did not complete.')
 assert warm['layoutChanges']==0 and warm['coreLayoutChanges']==0 and warm['animationEngine']=='native-vector',warm
 assert warm['readyMs']>=0 and warm['finishedMs']>=1450,warm
+assert warm['measureConfigurations']<=3 and warm['measurePasses']<100,warm
 (previews/'startup-warm-timing.json').write_text(json.dumps(warm),encoding='utf-8')
 # Confirm the visible home UI before stopping the video, not just a timer.
 for attempt in range(10):

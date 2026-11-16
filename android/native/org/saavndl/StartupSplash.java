@@ -43,7 +43,7 @@ public final class StartupSplash {
     private static AnimatedVectorDrawable wave;
     private static ObjectAnimator breathing;
     private static volatile boolean active;
-    private static volatile int starts, frames, longFrames, layoutChanges, coreLayoutChanges;
+    private static volatile int starts, frames, longFrames, layoutChanges, coreLayoutChanges, measureConfigurations, measurePasses;
     private static volatile long started, readyAt=-1, finishedAt=-1, maxFrameGap;
     private static long previousFrame;
     private static int dp(Activity a,float value) { return Math.round(value*a.getResources().getDisplayMetrics().density); }
@@ -60,10 +60,13 @@ public final class StartupSplash {
         TextView title,tagline;
         boolean introScheduled;
         int anchorX,anchorY,anchorWidth,anchorHeight;
+        int configuredWidth=-1,configuredHeight=-1;
         SplashContent(Activity activity) {super(activity);owner=activity;}
         @Override protected void onMeasure(int widthSpec,int heightSpec) {
-            if(core!=null) {
-                int width=MeasureSpec.getSize(widthSpec),height=MeasureSpec.getSize(heightSpec);
+            measurePasses++;
+            int width=MeasureSpec.getSize(widthSpec),height=MeasureSpec.getSize(heightSpec);
+            if(core!=null && (width!=configuredWidth || height!=configuredHeight)) {
+                configuredWidth=width;configuredHeight=height;measureConfigurations++;
                 boolean landscape=width>height && height<dp(owner,480);
                 int size=landscape?dp(owner,130):Math.max(dp(owner,140),Math.min(dp(owner,230),Math.round(width*.43f)));
                 core.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
@@ -72,7 +75,7 @@ public final class StartupSplash {
                 LinearLayout.LayoutParams labelParams=(LinearLayout.LayoutParams)labels.getLayoutParams();
                 int left=landscape?dp(owner,24):0,top=landscape?0:dp(owner,20);
                 if(labelParams.leftMargin!=left || labelParams.topMargin!=top){labelParams.leftMargin=left;labelParams.topMargin=top;labels.setLayoutParams(labelParams);}
-                labels.setGravity(landscape?Gravity.LEFT:Gravity.CENTER_HORIZONTAL);
+                labels.setGravity(Gravity.TOP|(landscape?Gravity.LEFT:Gravity.CENTER_HORIZONTAL));
                 title.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?32:38);
                 tagline.setTextSize(TypedValue.COMPLEX_UNIT_DIP,landscape?10:12);
             }
@@ -168,7 +171,7 @@ public final class StartupSplash {
     }
 
     public static String stats() {
-        try {JSONObject data=new JSONObject();data.put("starts",starts);data.put("active",active);data.put("readyMs",readyAt);data.put("finishedMs",finishedAt);data.put("frames",frames);data.put("maxFrameGapMs",maxFrameGap);data.put("longFrames",longFrames);data.put("layoutChanges",layoutChanges);data.put("coreLayoutChanges",coreLayoutChanges);data.put("animationEngine","native-vector");return data.toString();}
+        try {JSONObject data=new JSONObject();data.put("starts",starts);data.put("active",active);data.put("readyMs",readyAt);data.put("finishedMs",finishedAt);data.put("frames",frames);data.put("maxFrameGapMs",maxFrameGap);data.put("longFrames",longFrames);data.put("layoutChanges",layoutChanges);data.put("coreLayoutChanges",coreLayoutChanges);data.put("measureConfigurations",measureConfigurations);data.put("measurePasses",measurePasses);data.put("animationEngine","native-vector");return data.toString();}
         catch(Exception ignored){return "{}";}
     }
 }
