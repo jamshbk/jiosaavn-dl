@@ -135,6 +135,22 @@ def check():
                 expect(page.locator('#details-heading')).to_have_text('Album results')
                 expect(page.locator('#albums .album-card')).to_have_count(2)
                 assert not errors, errors
+                # On Android the persistent native overlay is already playing;
+                # the app page must not paint or restart another CSS splash.
+                native=browser.new_page(viewport={'width':393,'height':852})
+                handoffs=[]
+                native.on('request',lambda request: handoffs.append(request.url) if request.url.endswith('/api/startup/ready') else None)
+                native.add_init_script("window.splashAnimations=0;document.addEventListener('animationstart',event=>{if(event.target.closest('#splash'))window.splashAnimations++;},true);")
+                android_html=(main.ROOT/'web/index.html').read_text().replace('__APP_TOKEN__',main.TOKEN).replace('<html lang="en">','<html lang="en" class="native-startup">')
+                native.route('http://127.0.0.1:5000/',lambda route:route.fulfill(status=200,content_type='text/html',body=android_html))
+                with native.expect_request('**/api/startup/ready'):
+                    native.goto('http://127.0.0.1:5000/')
+                expect(native.locator('#splash')).to_be_hidden()
+                native.wait_for_function('document.querySelector("#home-status").textContent === "Ready."')
+                native.wait_for_timeout(700)
+                assert len(handoffs)==1,handoffs
+                assert native.evaluate('window.splashAnimations')==0,'App page replayed the startup animation'
+                native.close()
                 browser.close()
         finally:
             server.shutdown();server.server_close()

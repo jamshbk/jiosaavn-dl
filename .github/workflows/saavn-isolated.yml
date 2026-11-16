@@ -1,4 +1,4 @@
-name: Build SaavnDl 1.0 splash update
+name: Build SaavnDl 1.0 continuous splash
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -93,18 +93,21 @@ jobs:
               assert 'classes.dex' in z.namelist()
               loader = z.read('assets/_load.html').decode()
               assert 'saavndl-bootstrap' in loader, 'Default WebView loader must be replaced'
-              assert 'startup-logo.png' in loader
+              assert 'splash-core' not in loader, 'Bootstrap must not play a second splash'
+              splash = z.read('assets/_splash.html').decode()
+              assert 'startup-logo.png' in splash and 'splash-core' in splash
+              assert 'splash-orbit' not in splash
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
               assert '.splash' in z.read('assets/startup-style.css').decode()
-          shutil.copyfile(files[0], 'SaavnDl-v1.0-no-circle.apk')
+          shutil.copyfile(files[0], 'SaavnDl-v1.0-smooth-splash.apk')
           PY
-          sha256sum SaavnDl-v1.0-no-circle.apk > SHA256SUMS.txt
+          sha256sum SaavnDl-v1.0-smooth-splash.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
           name: saavndl-v1.0-${{ matrix.arch }}
           path: |
-            android/SaavnDl-v1.0-no-circle.apk
+            android/SaavnDl-v1.0-smooth-splash.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -142,7 +145,7 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
-          disable-animations: true
+          disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: python android/tests/emulator_check.py
       - name: Save test result only
@@ -153,6 +156,8 @@ jobs:
           path: |
             android/native-check-result.txt
             android/native-previews/*.png
+            android/native-previews/*.mp4
+            android/native-previews/*.json
           if-no-files-found: ignore
   publish:
     name: Publish checked APK
@@ -169,4 +174,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create saavndl-v1.0-no-circle apk/SaavnDl-v1.0-no-circle.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — splash without circle' --notes 'Removed only the outer orbit circle and moving dot from both startup splash stages. Logo, text, waveform animation, search, album ZIP, settings and download behavior remain unchanged. Version 1.0, version code 1003. Android 10+, ARM64.'
+          gh release create saavndl-v1.0-smooth-splash apk/SaavnDl-v1.0-smooth-splash.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'SaavnDl 1.0 — continuous splash' --notes 'One continuous startup splash persists while Python and the app WebView load, then fades out only after the home page renders. Removed duplicate startup replay and oversized presplash logo. Waveform uses compositor transforms. Includes Android 10 and 15 startup video checks with animations enabled. Version 1.0, code 1004. Android 10+, ARM64.'

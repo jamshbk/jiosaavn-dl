@@ -269,8 +269,14 @@ async function init(){
   renderScreen();
   try{prefs=await api('settings');populateSettings();await Promise.all([poll(),loadDestination()]);}
   catch(error){message(error.message);}
-  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setTimeout(dismissSplash,Math.max(0,(reduced?150:1450)-(performance.now()-splashStarted)));
+  if(document.documentElement.classList.contains('native-startup')){
+    $('splash').hidden=true;
+    // Paint the real home screen behind the existing overlay before fading it.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>api('startup/ready',{}).catch(()=>{})));
+  }else{
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(dismissSplash,Math.max(0,(reduced?150:1450)-(performance.now()-splashStarted)));
+  }
   setInterval(poll,1000);
 }
 init();

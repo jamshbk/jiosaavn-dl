@@ -122,6 +122,13 @@ class BackendTests(unittest.TestCase):
 
 
 class ApiTests(unittest.TestCase):
+    def test_home_ready_handoff_uses_cached_native_bridge(self):
+        ui=Mock()
+        with patch.object(main,'ANDROID',True), patch('android_bridge.get_bridge',return_value={'NativeUi':ui}):
+            result=self.request('/api/startup/ready',{}).args[0]
+            self.assertTrue(result['ok'])
+            ui.finishStartup.assert_called_once_with()
+
     def test_album_search_does_not_mix_in_track_search_results(self):
         with patch.object(main,'Client') as cls:
             cls.return_value.search_albums.return_value=[{'title':'Album','url':'https://www.jiosaavn.com/album/a/t'}]

@@ -105,6 +105,10 @@ public final class NativeUi implements PythonActivity.ActivityResultListener {
 
     public static String getLayoutMetrics() { return metrics; }
 
+    public static void finishStartup() { StartupSplash.ready(activity); }
+
+    public static String getStartupStats() { return StartupSplash.stats(); }
+
     public static String getDestination() {
         try {
             JSONObject data=new JSONObject();

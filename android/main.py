@@ -196,6 +196,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/':
             page = (ROOT / 'web/index.html').read_text(encoding='utf-8').replace('__APP_TOKEN__', TOKEN)
+            if ANDROID:
+                page = page.replace('<html lang="en">', '<html lang="en" class="native-startup">')
             return self.respond(page.encode(), mime='text/html; charset=utf-8')
         if path in ('/assets/style.css', '/assets/app.js'):
             name = path.rsplit('/', 1)[-1]
@@ -219,6 +221,11 @@ class Handler(BaseHTTPRequestHandler):
                 from android_bridge import get_bridge
                 return self.respond(json.loads(str(get_bridge()['NativeUi'].getLayoutMetrics())))
             return self.respond({})
+        if path == '/api/startup':
+            if ANDROID:
+                from android_bridge import get_bridge
+                return self.respond(json.loads(str(get_bridge()['NativeUi'].getStartupStats())))
+            return self.respond({})
         return self.respond({'error': 'Not found.'}, 404)
 
     def do_POST(self):
@@ -232,6 +239,11 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body, dict):
                 raise ValueError('Invalid request.')
             path = urlparse(self.path).path
+            if path == '/api/startup/ready':
+                if ANDROID:
+                    from android_bridge import get_bridge
+                    get_bridge()['NativeUi'].finishStartup()
+                return self.respond({'ok': True})
             if path == '/api/settings':
                 return self.respond(PREFS.save(body.get('patch'), reset=body.get('reset') is True))
             if path == '/api/archive':
