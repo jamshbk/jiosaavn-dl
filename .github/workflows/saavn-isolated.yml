@@ -174,4 +174,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create js-dl-v2.0 apk/JS-DL-v2.0.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'JS-DL 2.0' --notes 'JS-DL 2.0: original-source credit for bunnykek/jiosaavn-dl; continuous album and playlist playback, Play all, Shuffle, previous/next and queue position. Android 10+, ARM64.'
+          gh release create js-dl-v2.0-repeat apk/JS-DL-v2.0.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'JS-DL 2.0' --notes 'JS-DL 2.0 update: Repeat off, Repeat one and Repeat all, including shuffle queues and manual track navigation. Footer credits Bunnykek and App by James without a source link. Version code 2001; Android 10+, ARM64.'

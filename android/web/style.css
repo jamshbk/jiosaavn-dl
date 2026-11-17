@@ -42,3 +42,4 @@ audio{accent-color:var(--cyan)}
 .queue-actions [aria-pressed="true"]{background:#bf103e;color:white}
 .credits{display:block;max-width:100%;line-height:1.6}
 .credits a{color:#ff8aa8;overflow-wrap:anywhere}
+.queue-actions select{width:auto;min-height:44px;max-width:100%;padding:8px 12px}

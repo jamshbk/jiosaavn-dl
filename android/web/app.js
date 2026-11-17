@@ -6,7 +6,7 @@ let destination = {uri:'',path:'Downloads',pending:false}, destinationTimer;
 let prefs = {}, current = null, query = '', page = 1, busy = false, downloading = false;
 let selected = new Set(), returning = 'home', playing = null, playSequence = 0;
 let showJob = false, jobPolling = false, settingsQueue = Promise.resolve(), toastTimer;
-let playbackQueue = [], queueIndex = -1, shuffle = false;
+let playbackQueue = [], queueIndex = -1, shuffle = false, repeatMode = 'off';
 let searchType = 'tracks', searchResults = null;
 const icons = {
   play:'<svg viewBox="0 0 24 24"><path d="m9 5 11 7-11 7z"/></svg>',
@@ -252,8 +252,8 @@ function shuffled(songs){
 }
 function renderQueue(){
   $('queue-position').textContent=playbackQueue.length ? (queueIndex+1)+' / '+playbackQueue.length : '';
-  $('player-previous').disabled=queueIndex<=0;
-  $('player-next').disabled=queueIndex<0 || queueIndex>=playbackQueue.length-1;
+  $('player-previous').disabled=queueIndex<0 || (repeatMode!=='all' && queueIndex===0);
+  $('player-next').disabled=queueIndex<0 || (repeatMode!=='all' && queueIndex>=playbackQueue.length-1);
   $('player-shuffle').setAttribute('aria-pressed',String(shuffle));
 }
 function startPlayback(song, mix=false){
@@ -267,7 +267,9 @@ function startPlayback(song, mix=false){
   renderQueue();return playSong(playbackQueue[queueIndex]);
 }
 function moveQueue(offset){
-  const next=queueIndex+offset;
+  if(!playbackQueue.length)return;
+  let next=queueIndex+offset;
+  if(repeatMode==='all')next=(next+playbackQueue.length)%playbackQueue.length;
   if(next<0 || next>=playbackQueue.length)return;
   queueIndex=next;renderQueue();return playSong(playbackQueue[queueIndex],false,true);
 }
@@ -282,8 +284,17 @@ $('player-shuffle').onclick=()=>{
   playbackQueue=[playing,...(shuffle?shuffled(rest):rest.sort((a,b)=>a.queueOrder-b.queueOrder))];
   queueIndex=0;renderQueue();
 };
+$('player-repeat').onchange=event=>{
+  repeatMode=event.target.value;
+  $('audio').loop=repeatMode==='one';
+  renderQueue();
+};
 $('audio').onended=()=>{
-  if(queueIndex<playbackQueue.length-1)moveQueue(1);
+  if(!playing || !playbackQueue.length)return;
+  if(repeatMode==='one'){
+    const audio=$('audio');audio.currentTime=0;
+    audio.play().catch(()=>{$('player-status').textContent='Tap play to repeat this song.';});
+  }else if(queueIndex<playbackQueue.length-1 || repeatMode==='all')moveQueue(1);
   else $('player-status').textContent='Playback finished.';
 };
 async function playSong(song,resume=false,automatic=false){
