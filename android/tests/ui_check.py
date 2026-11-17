@@ -101,8 +101,7 @@ def check():
                     wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(8000)
                     wav.writeframes(bytes(8000*2*30))
                 page.route('https://aac.saavncdn.com/test.m4a',lambda route:route.fulfill(status=200,content_type='audio/wav',body=buf.getvalue()))
-                expect(page.locator('#home footer')).to_contain_text('Original source and credit to Bunnykek')
-                expect(page.locator('#home footer')).to_contain_text('App by James')
+                expect(page.locator('#home footer')).to_contain_text('Original Source and Credit to Bunnykek & CLI By JZB')
                 assert page.locator('footer a').count()==0
                 for link,heading in [('https://www.jiosaavn.com/featured/example/token','Playlist details'),('https://www.jiosaavn.com/album/evening/token','Album details')]:
                     page.locator('#details-back').click()
