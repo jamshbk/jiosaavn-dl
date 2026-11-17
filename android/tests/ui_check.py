@@ -27,7 +27,7 @@ class FixtureClient:
         return [{'title':'Evening Sessions','artist':'Example Artist','year':'2024','image':'','matched_song':'A Song With a Very Long Title','url':'https://www.jiosaavn.com/album/evening/token'},
                 {'title':'Other Album','artist':'Other Artist','year':'2023','image':'','url':'https://www.jiosaavn.com/album/other/token'}]
     def resolve(self, link):
-        return {'kind':'album', 'title':'Evening Sessions','artist':'Example Artist',
+        return {'kind':'playlist' if '/featured/' in link else 'album', 'title':'Evening Sessions','artist':'Example Artist',
                 'year':'2024','image':'','songs':SONGS}
     def media_url(self, song, quality):
         CALLS.append(('play',quality))
@@ -94,6 +94,34 @@ def check():
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Details overflow at {width}'
                 page.set_viewport_size({'width':393,'height':852})
                 page.screenshot(path=str(outputs/'album-393.png'),full_page=True)
+                # Browser media fixture permits real play() without external CDN access.
+                import io, wave
+                buf=io.BytesIO()
+                with wave.open(buf,'wb') as wav:
+                    wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(8000)
+                    wav.writeframes(bytes(8000*2*30))
+                page.route('https://aac.saavncdn.com/test.m4a',lambda route:route.fulfill(status=200,content_type='audio/wav',body=buf.getvalue()))
+                expect(page.locator('#home footer')).to_contain_text('bunnykek / jiosaavn-dl')
+                for link,heading in [('https://www.jiosaavn.com/featured/example/token','Playlist details'),('https://www.jiosaavn.com/album/evening/token','Album details')]:
+                    page.locator('#details-back').click()
+                    page.locator('#query').fill(link);page.locator('#archive').click()
+                    expect(page.locator('#details-heading')).to_have_text(heading)
+                    page.locator('#play-all').click()
+                    expect(page.locator('#queue-position')).to_have_text('1 / 2')
+                    page.wait_for_function("!document.getElementById('audio').paused")
+                    page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
+                    expect(page.locator('#queue-position')).to_have_text('2 / 2')
+                    expect(page.locator('#player-title')).to_have_text('<script>Not executable</script>')
+                    page.wait_for_function("!document.getElementById('audio').paused")
+                    page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
+                    expect(page.locator('#player-status')).to_have_text('Playback finished.')
+                    page.locator('#player-previous').click()
+                    expect(page.locator('#queue-position')).to_have_text('1 / 2')
+                    page.locator('#shuffle-all').click()
+                    expect(page.locator('#player-shuffle')).to_have_attribute('aria-pressed','true')
+                    assert page.evaluate('new Set(playbackQueue.map(s=>s.key)).size===2')
+                    page.locator('#close-player').click()
+                    expect(page.locator('#player')).to_be_hidden()
                 page.locator('.track-check').nth(1).uncheck()
                 expect(page.locator('#download-selected')).to_have_text('Download selected (1)')
                 page.locator('#download-selected').click()

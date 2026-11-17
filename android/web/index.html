@@ -16,7 +16,7 @@
     <img src="/assets/logo.png" alt="JS-DL logo" class="splash-logo">
     <h1>JS<span>-DL</span></h1><p>Search. Play. Save.</p>
     <div class="splash-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-  </div><span class="splash-version">Version 1.0</span>
+  </div><span class="splash-version">Version 2.0</span>
 </div>
 <div id="home" class="screen home-screen">
   <header class="home-header"><button class="icon-button gear" data-open-settings aria-label="Open settings"><svg viewBox="0 0 24 24"><path d="m9.4 3-.5 2a8 8 0 0 0-1.6 1L5.4 5.4 3.4 9l1.5 1.5a8 8 0 0 0 0 2L3.4 14l2 3.6 1.9-.6a8 8 0 0 0 1.6 1l.5 2h4.2l.5-2a8 8 0 0 0 1.6-1l1.9.6 2-3.6-1.5-1.5a8 8 0 0 0 0-2L20.1 9l-2-3.6-1.9.6a8 8 0 0 0-1.6-1l-.5-2z"/><circle cx="11.5" cy="11.5" r="3"/></svg></button></header>
@@ -40,7 +40,7 @@
     </section>
     <p id="home-status" class="status" role="status" aria-live="polite">Ready.</p>
   </div></main>
-  <footer><strong>JS-DL</strong><span>Version 1.0</span></footer>
+  <footer><strong>JS-DL</strong><span>Version 2.0</span><small class="credits">Original source by <a href="https://github.com/bunnykek/jiosaavn-dl" target="_blank" rel="noopener noreferrer">bunnykek / jiosaavn-dl</a></small></footer>
 </div>
 
 <div id="details" class="screen content-screen" hidden>
@@ -51,6 +51,7 @@
       <div class="search-modes"><button type="button" data-search-type="albums" aria-pressed="false">Albums</button><button type="button" data-search-type="tracks" aria-pressed="true">Tracks</button></div>
     </div>
     <button id="download-album-zip" class="secondary full album-zip" data-download="true" hidden>Download album ZIP</button>
+    <div id="collection-playback" class="queue-actions" hidden><button id="play-all" class="primary">▶ Play all</button><button id="shuffle-all" class="secondary">⇄ Shuffle</button></div>
     <div id="selection-tools" class="selection-tools" hidden>
       <button id="select-all" class="text-button">Select all</button><button id="select-none" class="text-button">Clear</button><span id="selected-count"></span>
     </div>
@@ -61,7 +62,7 @@
     <nav id="pagination" class="pagination" hidden><button id="previous" class="secondary">Previous</button><span id="page-number"></span><button id="next" class="secondary">Next</button></nav>
     <p id="detail-status" class="status" role="status" aria-live="polite"></p>
   </main>
-  <footer><strong>JS-DL</strong><span>Version 1.0</span></footer>
+  <footer><strong>JS-DL</strong><span>Version 2.0</span><small class="credits">Original source by <a href="https://github.com/bunnykek/jiosaavn-dl" target="_blank" rel="noopener noreferrer">bunnykek / jiosaavn-dl</a></small></footer>
 </div>
 
 <div id="settings" class="screen content-screen" hidden>
@@ -113,11 +114,12 @@
     </details>
     <p id="settings-status" class="muted settings-status" role="status" aria-live="polite">Changes save automatically.</p>
   </main>
-  <footer><strong>JS-DL</strong><span>Version 1.0</span></footer>
+  <footer><strong>JS-DL</strong><span>Version 2.0</span><small class="credits">Original source by <a href="https://github.com/bunnykek/jiosaavn-dl" target="_blank" rel="noopener noreferrer">bunnykek / jiosaavn-dl</a></small></footer>
 </div>
 
 <aside id="player" class="player panel" hidden aria-label="Audio player">
   <div class="player-heading"><div class="player-info"><strong id="player-title"></strong><span id="player-artist" class="muted small"></span></div><select id="player-quality" aria-label="Playback quality"><option value="96">96k</option><option value="160">160k</option><option value="320">320k</option></select><button id="close-player" class="icon-button" aria-label="Close player">×</button></div>
+  <div class="queue-actions"><button id="player-previous" class="secondary" aria-label="Previous track">⏮</button><span id="queue-position" class="small muted"></span><button id="player-next" class="secondary" aria-label="Next track">⏭</button><button id="player-shuffle" class="secondary" aria-pressed="false">Shuffle</button></div>
   <audio id="audio" controls preload="none"></audio><p id="player-status" class="small muted" role="status"></p>
 </aside>
 <aside id="job" class="job panel" hidden aria-label="Download status" aria-live="polite">

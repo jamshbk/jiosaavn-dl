@@ -35,3 +35,10 @@ button,input,select{transition:background-color .18s,border-color .18s,box-shado
 .album-zip{background:linear-gradient(135deg,#452033,#2b1422);border-color:#963555;color:#ffadbf}.album-match{color:#ff8eae!important;font-size:11px!important;margin-top:6px!important}.gear{border-color:#543044}.eyebrow{color:#ff8eae}
 
 audio{accent-color:var(--cyan)}
+
+/* Collection playback and original-source credit. */
+.queue-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.queue-actions button{min-height:44px}
+.queue-actions [aria-pressed="true"]{background:#bf103e;color:white}
+.credits{display:block;max-width:100%;line-height:1.6}
+.credits a{color:#ff8aa8;overflow-wrap:anywhere}

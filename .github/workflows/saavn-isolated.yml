@@ -1,4 +1,4 @@
-name: Build JS-DL 1.0
+name: Build JS-DL 2.0
 on:
   push:
     branches: [codex/saavn-pocket-android]
@@ -70,7 +70,7 @@ jobs:
         if: matrix.arch == 'arm64-v8a'
         uses: actions/upload-artifact@v4
         with:
-          name: saavndl-v1.0-ui-previews
+          name: saavndl-v2.0-ui-previews
           path: android/ui-previews/*.png
       - name: Build isolated architecture
         env:
@@ -99,15 +99,15 @@ jobs:
               assert 'splash-core' not in loader, 'Bootstrap must not play a second splash'
               assert 'res/drawable/startup_wave_animated.xml' in z.namelist()
               assert z.read('assets/startup-logo.png').startswith(b'\x89PNG')
-          shutil.copyfile(files[0], 'JS-DL-v1.0.apk')
+          shutil.copyfile(files[0], 'JS-DL-v2.0.apk')
           PY
-          sha256sum JS-DL-v1.0.apk > SHA256SUMS.txt
+          sha256sum JS-DL-v2.0.apk > SHA256SUMS.txt
       - name: Upload architecture APK
         uses: actions/upload-artifact@v4
         with:
-          name: saavndl-v1.0-${{ matrix.arch }}
+          name: saavndl-v2.0-${{ matrix.arch }}
           path: |
-            android/JS-DL-v1.0.apk
+            android/JS-DL-v2.0.apk
             android/SHA256SUMS.txt
           if-no-files-found: error
   android-check:
@@ -131,7 +131,7 @@ jobs:
       - run: python -m pip install requests
       - uses: actions/download-artifact@v4
         with:
-          name: saavndl-v1.0-x86_64
+          name: saavndl-v2.0-x86_64
           path: android
       - name: Enable emulator acceleration
         run: |
@@ -152,7 +152,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: saavndl-v1.0-native-result-${{ matrix.api }}
+          name: saavndl-v2.0-native-result-${{ matrix.api }}
           path: |
             android/native-check-result.txt
             android/native-previews/*.png
@@ -166,7 +166,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: saavndl-v1.0-arm64-v8a
+          name: saavndl-v2.0-arm64-v8a
           path: apk
       - name: Publish direct APK download
         env:
@@ -174,4 +174,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          gh release create js-dl-v1.0 apk/JS-DL-v1.0.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'JS-DL 1.0' --notes 'JS-DL 1.0: album search now combines actual albums of matching songs with album-title matches, with token deduplication and correct pagination. Renamed app, new custom rose/coral gradient icon, music-inspired pink/red UI and native splash palette. Existing downloads, quality, custom-folder and album ZIP features retained. Version code 1008; Android 10+, ARM64.'
+          gh release create js-dl-v2.0 apk/JS-DL-v2.0.apk apk/SHA256SUMS.txt --target "$SOURCE_SHA" --prerelease --title 'JS-DL 2.0' --notes 'JS-DL 2.0: original-source credit for bunnykek/jiosaavn-dl; continuous album and playlist playback, Play all, Shuffle, previous/next and queue position. Android 10+, ARM64.'

@@ -133,7 +133,7 @@ public final class StartupSplash {
         int resource=activity.getResources().getIdentifier("startup_wave_animated","drawable",activity.getPackageName());
         wave=(AnimatedVectorDrawable)activity.getDrawable(resource);bars.setImageDrawable(wave);
         LinearLayout.LayoutParams waveParams=new LinearLayout.LayoutParams(dp(activity,40),dp(activity,28));waveParams.topMargin=dp(activity,26);labels.addView(bars,waveParams);
-        TextView version=text(activity,"Version 1.0",Color.rgb(146,120,135),11);version.setLetterSpacing(.09f);
+        TextView version=text(activity,"Version 2.0",Color.rgb(146,120,135),11);version.setLetterSpacing(.09f);
         FrameLayout.LayoutParams versionParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);versionParams.bottomMargin=dp(activity,25);safe.addView(version,versionParams);
         safe.core=core;safe.labels=labels;safe.logo=logo;safe.title=title;safe.tagline=tagline;
         overlay.setOnApplyWindowInsetsListener((view,insets) -> {
