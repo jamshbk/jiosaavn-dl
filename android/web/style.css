@@ -43,3 +43,40 @@ audio{accent-color:var(--cyan)}
 .credits{display:block;max-width:100%;line-height:1.6}
 .credits a{color:#ff8aa8;overflow-wrap:anywhere}
 .queue-actions select{width:auto;min-height:44px;max-width:100%;padding:8px 12px}
+
+/* Keep the keyboard, the search field and the matching covers together. */
+.typing .hero{align-items:flex-start;padding-top:6px;padding-bottom:14px}
+.typing .tagline,.typing .search-hint,.typing #home-status{display:none}
+.typing .brand-line{justify-content:flex-start;margin-bottom:14px}
+.typing .search-card{padding:14px}
+.typing .search-options{margin-top:10px;padding:10px 3px}
+#instant-results{background:#211d26;border:1px solid #ffffff1a;border-radius:16px;overflow:hidden;text-align:left}
+#instant-status{margin:0;padding:9px 13px;font-size:12px;color:#c3b8c3}
+#instant-list{max-height:42vh;max-height:min(42dvh,370px);overflow-y:auto;overscroll-behavior:contain}
+.suggestion{width:100%;border:0;border-top:1px solid #ffffff10;background:transparent;color:var(--text);text-align:left;display:flex;align-items:center;gap:12px;padding:10px 13px;min-width:0}
+.suggestion:focus-visible,.suggestion:active{background:#352534}
+.suggestion .art{width:46px;height:46px;border-radius:7px;flex-shrink:0}
+.suggestion-copy{min-width:0;display:grid;gap:4px}
+.suggestion-copy>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suggestion-copy strong{font-size:15px}.suggestion-copy span{color:var(--muted);font-size:13px}
+.single-detail #collection{padding:18px;align-items:center;background:linear-gradient(145deg,#362632,#19151e)}
+.single-detail #collection>.art{width:clamp(74px,24vw,130px);height:clamp(74px,24vw,130px);border-radius:12px}
+.detail-play{margin-top:8px}.single-detail #download-selected{margin-top:8px}
+body.with-player{padding-bottom:calc(190px + var(--safe-bottom))}
+.player{position:fixed;z-index:5;bottom:calc(6px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:min(calc(100% - 20px - var(--safe-left,0px) - var(--safe-right,0px)),490px);margin:0;padding:12px 16px 9px;border:1px solid #ffffff28;border-radius:22px;background:radial-gradient(ellipse at 12% 115%,#183f59,transparent 65%),radial-gradient(ellipse at 96% 110%,#472f44,transparent 60%),#0c0c10;box-shadow:0 7px 28px #0009}
+.player-heading{gap:10px}.player-heading .art{display:block;width:48px;height:48px;border-radius:9px}.player-info strong,.player-info span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.player-info strong{font-size:16px}.player-info span{color:#afa8b4;font-size:13px}
+.player-heading select{width:58px;padding:4px;background:#ffffff0e;border:1px solid #ffffff25}
+.transport{display:flex;align-items:center;justify-content:space-between;margin:7px 0 2px}
+.transport-key{position:relative;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;padding:0;color:#f4eff4;background:transparent}
+.transport-key svg{width:24px;height:24px;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;fill:none}.transport-key .solid{fill:currentColor;stroke:none}
+.transport-key:active{background:#ffffff16}
+.transport-key[aria-pressed=true],#player-repeat[data-mode=all],#player-repeat[data-mode=one]{color:#ff98b5;background:#ffffff0e}
+#player-toggle svg{width:30px;height:30px}
+.pause-glyph,#player-toggle[data-active=true] .play-glyph,.repeat-one{display:none}
+#player-toggle[data-active=true] .pause-glyph{display:block}
+#player-repeat[data-mode=one] .repeat-one{display:block;position:absolute;font-size:9px;line-height:1}
+.timeline{display:flex;align-items:center;gap:9px;font-size:11px;color:#d6ccd6;font-variant-numeric:tabular-nums}
+.timeline input{width:0;min-width:0;flex:1;padding:0;height:24px;accent-color:#ffe0e9;background:transparent}
+.player-caption{display:flex;align-items:baseline;justify-content:space-between;gap:10px;color:#aaa3ad;font-size:10px}.player-caption span:last-child{text-align:right}
+.with-player .job{bottom:calc(190px + var(--safe-bottom));z-index:6}
+@media(max-height:450px){.player{padding:5px 12px}.player-heading .art{width:34px;height:34px}.transport{margin:0}.typing .brand-line{display:none}}

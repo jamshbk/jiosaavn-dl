@@ -267,7 +267,15 @@ class Handler(BaseHTTPRequestHandler):
                                          'albums': albums, 'songs': [], 'page': page,
                                          'has_more': bool(getattr(client, 'album_has_more', len(albums) >= 20)),
                                          'note': str(getattr(client, 'album_search_note', ''))})
-                songs = register(client.search(query, page))
+                rows = client.search(query, page)
+                if body.get('suggest') is True:
+                    # Typing should not allocate download keys or evict the active queue.
+                    return self.respond({'suggestions': [
+                        {'title': clean(row.get('song') or row.get('title')),
+                         'artist': clean(row.get('primary_artists')),
+                         'image': row.get('image') or '', 'url': row['perma_url']}
+                        for row in rows]})
+                songs = register(rows)
                 return self.respond({'kind': 'search', 'title': query, 'songs': songs, 'page': page})
             if path == '/api/clipboard':
                 if not ANDROID:

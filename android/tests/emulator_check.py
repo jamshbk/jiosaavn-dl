@@ -12,7 +12,7 @@ def adb(*args, check=True):
     return subprocess.run(['adb',*args],check=check,text=True,capture_output=True).stdout
 
 
-apk=Path('android/JS-DL-v2.0.apk')
+apk=Path('android/JS-DL-v3.0.apk')
 adb('install','-r',str(apk))
 # Keep software-GPU capture representative and avoid 1080p encoder overload.
 adb('shell','wm','size','540x960')

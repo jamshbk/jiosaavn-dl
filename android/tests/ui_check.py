@@ -27,6 +27,9 @@ class FixtureClient:
         return [{'title':'Evening Sessions','artist':'Example Artist','year':'2024','image':'','matched_song':'A Song With a Very Long Title','url':'https://www.jiosaavn.com/album/evening/token'},
                 {'title':'Other Album','artist':'Other Artist','year':'2023','image':'','url':'https://www.jiosaavn.com/album/other/token'}]
     def resolve(self, link):
+        if '/song/' in link:
+            song = next(row for row in SONGS if row['perma_url']==link)
+            return {'kind':'song','title':song['song'],'artist':song['primary_artists'],'image':'','year':song['year'],'songs':[song]}
         return {'kind':'playlist' if '/featured/' in link else 'album', 'title':'Evening Sessions','artist':'Example Artist',
                 'year':'2024','image':'','songs':SONGS}
     def media_url(self, song, quality):
@@ -83,6 +86,14 @@ def check():
                 expect(page.locator('#quality')).to_have_value('160')
                 expect(page.locator('[data-setting="single_track_template"]')).to_have_value('{artist} - {title}')
                 page.locator('#settings-back').click()
+                page.locator('#query').fill('Evening')
+                expect(page.locator('#instant-list button')).to_have_count(2)
+                page.screenshot(path=str(outputs/'live-results.png'))
+                page.locator('#instant-list button').nth(1).click()
+                expect(page.locator('#collection h2')).to_have_text(SONGS[1]['song'])
+                expect(page.locator('#download-selected')).to_have_text('Download song')
+                page.screenshot(path=str(outputs/'track-preview.png'))
+                page.locator('#details-back').click()
                 page.locator('#query').fill('https://www.jiosaavn.com/album/evening/token')
                 page.locator('#archive').click()
                 expect(page.locator('#details')).to_be_visible()
@@ -108,6 +119,10 @@ def check():
                     page.locator('#query').fill(link);page.locator('#archive').click()
                     expect(page.locator('#details-heading')).to_have_text(heading)
                     page.locator('#play-all').click()
+                    page.get_by_role('button',name='Pause',exact=True).click()
+                    assert page.locator('#audio').evaluate('(a)=>a.paused')
+                    page.get_by_role('button',name='Play',exact=True).click()
+                    page.screenshot(path=str(outputs/'now-playing.png'))
                     expect(page.locator('#queue-position')).to_have_text('1 / 2')
                     page.wait_for_function("!document.getElementById('audio').paused")
                     page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
@@ -116,11 +131,11 @@ def check():
                     page.wait_for_function("!document.getElementById('audio').paused")
                     page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
                     expect(page.locator('#player-status')).to_have_text('Playback finished.')
-                    page.locator('#player-repeat').select_option('all')
+                    page.locator('#player-repeat').click()
                     page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
                     expect(page.locator('#queue-position')).to_have_text('1 / 2')
                     page.wait_for_function("!document.getElementById('audio').paused")
-                    page.locator('#player-repeat').select_option('one')
+                    page.locator('#player-repeat').click()
                     assert page.locator('#audio').evaluate('(a)=>a.loop')
                     title=page.locator('#player-title').inner_text()
                     page.evaluate("document.getElementById('audio').dispatchEvent(new Event('ended'))")
@@ -128,7 +143,7 @@ def check():
                     expect(page.locator('#queue-position')).to_have_text('1 / 2')
                     page.locator('#player-next').click()
                     expect(page.locator('#queue-position')).to_have_text('2 / 2')
-                    page.locator('#player-repeat').select_option('off')
+                    page.locator('#player-repeat').click()
                     assert not page.locator('#audio').evaluate('(a)=>a.loop')
                     page.locator('#player-previous').click()
                     expect(page.locator('#queue-position')).to_have_text('1 / 2')
