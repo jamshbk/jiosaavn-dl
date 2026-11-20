@@ -199,7 +199,7 @@ def check():
                 handoffs=[]
                 native.on('request',lambda request: handoffs.append(request.url) if request.url.endswith('/api/startup/ready') else None)
                 native.add_init_script("window.splashAnimations=0;document.addEventListener('animationstart',event=>{if(event.target.closest('#splash'))window.splashAnimations++;},true);")
-                android_html=(main.ROOT/'web/index.html').read_text().replace('__APP_TOKEN__',main.TOKEN).replace('<html lang="en">','<html lang="en" class="native-startup">')
+                android_html=(main.ROOT/'web/index.html').read_text(encoding='utf-8').replace('__APP_TOKEN__',main.TOKEN).replace('<html lang="en">','<html lang="en" class="native-startup">')
                 native.route('http://127.0.0.1:5000/',lambda route:route.fulfill(status=200,content_type='text/html',body=android_html))
                 with native.expect_request('**/api/startup/ready'):
                     native.goto('http://127.0.0.1:5000/')
