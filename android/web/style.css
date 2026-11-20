@@ -80,3 +80,8 @@ body.with-player{padding-bottom:calc(190px + var(--safe-bottom))}
 .player-caption{display:flex;align-items:baseline;justify-content:space-between;gap:10px;color:#aaa3ad;font-size:10px}.player-caption span:last-child{text-align:right}
 .with-player .job{bottom:calc(190px + var(--safe-bottom));z-index:6}
 @media(max-height:450px){.player{padding:5px 12px}.player-heading .art{width:34px;height:34px}.transport{margin:0}.typing .brand-line{display:none}}
+
+#job-detail,.job p{overflow-wrap:anywhere}
+.content,.album-card,.albums{min-width:0}
+.albums{grid-template-columns:minmax(0,1fr)}
+.pagination{flex-wrap:wrap}
