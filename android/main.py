@@ -151,7 +151,8 @@ def download_worker(records, options, bundle):
 def export(path, folder, subfolder):
     if ANDROID:
         return publish(path, True, folder, subfolder)
-    destination = DATA / 'Downloads' / folder / subfolder / path.name
+    from desktop import output_folder
+    destination = output_folder(folder) / subfolder / path.name
     destination.parent.mkdir(parents=True, exist_ok=True)
     index = 2
     while destination.exists():
@@ -193,6 +194,8 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self):
+        if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
+            return self.respond({'error':'Invalid host.'}, 403)
         path = urlparse(self.path).path
         if path == '/':
             page = (ROOT / 'web/index.html').read_text(encoding='utf-8').replace('__APP_TOKEN__', TOKEN)
@@ -215,7 +218,8 @@ class Handler(BaseHTTPRequestHandler):
             if ANDROID:
                 from storage import get_destination
                 return self.respond(get_destination())
-            return self.respond({'uri':'','label':'Downloads','path':'Downloads','pending':False,'error':'','desktop':True})
+            from desktop import destination_state
+            return self.respond(destination_state(PREFS.get()['folder']))
         if path == '/api/device':
             if ANDROID:
                 from android_bridge import get_bridge
@@ -284,7 +288,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'text': read_clipboard()})
             if path in ('/api/folder/pick','/api/folder/default'):
                 if not ANDROID:
-                    raise ValueError('The Android folder picker is available on the phone app.')
+                    from desktop import change_destination
+                    with LOCK:
+                        if JOB['active']:
+                            raise ValueError('Please wait for the download to finish.')
+                        return self.respond(change_destination(path.endswith('/pick'), PREFS.get()['folder']))
                 with LOCK:
                     if JOB['active']:
                         raise ValueError('Wait for the current download to finish before changing folders.')
@@ -323,6 +331,9 @@ class Handler(BaseHTTPRequestHandler):
                         from storage import get_destination
                         destination=get_destination()
                         options['_destination']=destination.get('path',destination['label']) if destination.get('uri') else 'Downloads/'+options['folder']
+                    else:
+                        from desktop import output_folder
+                        options['_destination'] = str(output_folder(options['folder']))
                     output_format = body.get('format')
                     if output_format not in (None, 'zip'):
                         raise ValueError('Unsupported download format.')

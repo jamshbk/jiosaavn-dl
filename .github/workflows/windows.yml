@@ -1,0 +1,45 @@
+name: JS-DL Windows 1.0
+on:
+  push:
+    branches: [codex/js-dl-windows]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pyinstaller requests mutagen pillow playwright
+      - name: Exercise Windows search, player and file export
+        run: |
+          python -m playwright install chromium
+          python android/tests/ui_check.py
+      - name: Build portable application
+        run: python -m PyInstaller --noconfirm --onefile --windowed --name JS-DL-Windows-v1.0 --icon android/assets/icon.png --version-file windows-version.txt --add-data "android/web;web" --collect-data certifi android/windows_app.py
+      - name: Verify portable window and version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-Item dist/JS-DL-Windows-v1.0.exe
+          if ($exe.VersionInfo.ProductVersion -ne '1.0') { throw 'Wrong version' }
+          $proc = Start-Process $exe.FullName -PassThru
+          $window = $null
+          for ($i=0; $i -lt 90; $i++) {
+            $window = Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*JS-DL*' } | Select-Object -First 1
+            if ($window) { break }
+            if ($proc.HasExited) { throw 'Application exited during launch' }
+            Start-Sleep 1
+          }
+          if (!$window) { throw 'Could not find JS-DL window' }
+          $window.CloseMainWindow()
+          if (!$proc.WaitForExit(45000)) { throw 'App did not exit after closing window' }
+          if ($proc.ExitCode -ne 0) { throw 'Unexpected exit code' }
+      - name: Publish Windows EXE
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create js-dl-windows-v1.0 dist/JS-DL-Windows-v1.0.exe --target ${{ github.sha }} --title "JS-DL for Windows 1.0" --notes "Portable Windows x64 application. Requires Microsoft Edge. Downloads go to Downloads/JS-DL or a folder you choose."

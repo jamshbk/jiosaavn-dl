@@ -45,7 +45,7 @@ class FixtureClient:
 
 def check():
     outputs=Path('ui-previews');outputs.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory() as d, patch.object(main,'DATA',Path(d)), patch.object(main,'PREFS',Settings(Path(d)/'settings.json')), patch.object(main,'Client',FixtureClient):
+    with tempfile.TemporaryDirectory() as d, patch.dict('os.environ', {'SAAVN_DATA_DIR':d}), patch('desktop.downloads_folder', return_value=Path(d)/'Downloads'), patch.object(main,'DATA',Path(d)), patch.object(main,'PREFS',Settings(Path(d)/'settings.json')), patch.object(main,'Client',FixtureClient):
         server=main.ThreadingHTTPServer(('127.0.0.1',5000),main.Handler)
         threading.Thread(target=server.serve_forever,daemon=True).start()
         try:

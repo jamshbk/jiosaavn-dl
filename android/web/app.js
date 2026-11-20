@@ -271,12 +271,12 @@ function renderFilenamePreviews(){
   });
 }
 function renderDestination(){
-  $('destination-path').value=destination.uri?destination.path:'Downloads/'+(prefs.folder||'JS-DL');
+  $('destination-path').value=destination.path || 'Downloads/'+(prefs.folder||'JS-DL');
   $('choose-folder').disabled=downloading||destination.pending;
   $('default-folder').disabled=downloading||destination.pending||!destination.uri;
   $('reset').disabled=downloading||destination.pending;
   $('folder').disabled=!!destination.uri;
-  $('destination-status').textContent=destination.error||(destination.pending?'Choose a folder in the Android picker…':destination.uri?'Custom location saved. Album and disc folders are created inside it.':'Choose a folder on your phone or SD card. Your choice is remembered.');
+  $('destination-status').textContent=destination.error||(destination.pending?'Choose a folder in the Windows picker…':destination.uri?'Custom location saved. Album and disc folders are created inside it.':'Choose a folder on your PC. Your choice is remembered.');
 }
 async function loadDestination(){try{destination=await api('destination');renderDestination();}catch(error){$('destination-status').textContent=error.message;}}
 $('choose-folder').onclick=async()=>{
@@ -293,7 +293,7 @@ function saveSetting(key,value){
   settingsQueue=settingsQueue.catch(()=>{}).then(async()=>{
     try {
       prefs=await api('settings',{patch:{[key]:value}});
-      $('settings-status').textContent='Changes save automatically.';renderFilenamePreviews();renderDestination();
+      $('settings-status').textContent='Changes save automatically.';renderFilenamePreviews();await loadDestination();
       if(key==='quality'){
         document.querySelector('[data-setting="quality"]').value=prefs.quality;
         $('player-quality').value=prefs.quality;qualityNote();
